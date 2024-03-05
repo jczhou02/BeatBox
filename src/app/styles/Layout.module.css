@@ -1,0 +1,15 @@
+/* Layout.module.css */
+.container {
+    display: flex;
+  }
+  
+  .sidenav {
+    width: 200px; /* Adjust width as needed */
+    background-color: #f0f0f0;
+  }
+  
+  .main-content {
+    flex: 1;
+    padding: 20px; /* Adjust padding as needed */
+  }
+  
