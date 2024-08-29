@@ -1,22 +1,33 @@
 'use client';
 
-import { useState } from "react";
-import { initGoogleSignIn } from "./init-google-sign-in";
+import { useEffect, useState } from "react";
 
-/**
- * getUser returns 3 values
- * undefined to mean that google authentication is still loading
- * null to mean that the user is not logged in
- * object value to show that the user is logged in and to show details about the user
- */
 export const getUser = () => {
   const [user, setUser] = useState(undefined);
   const isLoading = user === undefined;
-  if (typeof document !== "undefined") {
-    const script = document.createElement("script");
-    script.src = "https://apis.google.com/js/platform.js";
-    script.onload = () => initGoogleSignIn(setUser);
-    document.body.appendChild(script);
-  }
+
+  useEffect(() => {
+    const handleCredentialResponse = (response) => {
+      if (response.credential) {
+        // Here you can decode the credential to get user information or pass it to your server
+        setUser(response); // Simplified example; handle this based on your app's needs
+      } else {
+        setUser(null);
+      }
+    };
+
+    window.google.accounts.id.initialize({
+      client_id: process.env.NEXT_PUBLIC_GOOGLE_ID,
+      callback: handleCredentialResponse,
+    });
+
+    window.google.accounts.id.prompt(); // Shows the one-tap sign-in prompt
+
+    // Cleanup
+    return () => {
+      setUser(null);
+    };
+  }, []);
+
   return { user, isLoading };
 };
