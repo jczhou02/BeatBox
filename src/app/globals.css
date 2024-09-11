@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
+  --foreground-rgb: 158,145,126;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 192,192,192;
 }
@@ -20,4 +20,8 @@
   .text-balance {
     text-wrap: balance;
   }
+}
+
+.bg-dark-slate-gray {
+  background-color: rgb(47, 106, 79);
 }

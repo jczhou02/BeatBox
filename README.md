@@ -1,4 +1,5 @@
 # This is some starter code in React with Google Auth
+runtime error related to user action functions/props may be fixed with 'use client'; at the top of the file
 
 ![Screenshot 2024-03-03 at 1 15 54 AM](https://github.com/vincentktieu101/react-google-auth-starter/assets/46038043/1aa76be7-48ae-4233-b932-2058b60af70e)
 

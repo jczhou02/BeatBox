@@ -4,9 +4,12 @@ import React, { useEffect, useState } from "react";
 import Script from 'next/script';
 import Layout from "./components/layout";
 import { Header } from "./components/header";
+import LoginForm from "../components/auth/LoginForm";
+import { auth } from "../auth";
 
-export default function Home() {
+export default async function Home() {
   const [isSigningIn, setIsSigningIn] = useState(false);
+  
 
   useEffect(() => {
     // Ensure that the google object is available
@@ -76,13 +79,13 @@ export default function Home() {
         strategy="beforeInteractive"
         onLoad={() => console.log('Google script loaded')}
       />
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center h-screen bg-dark-slate-gray">
         <div className="text-center">
           <img src="/beatboxlogofinal.svg" alt="BeatBox" width={180} height={37} />
-          <h2>Welcome to BeatBox! 🎵</h2>
           
-          {/* Render the Google Sign-In Button */}
-          <div id="google-signin-button"></div>
+          {/* Render the Google Sign-In Button
+          <div id="google-signin-button"></div> */}
+          <LoginForm />
           
           <pre>{/* Display user information here after login */}</pre>
         </div>
