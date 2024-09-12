@@ -6,5 +6,5 @@ In order to use this app on your local machine, register an app on developer.spo
 I was able to get the development servers and Next routing working using next-auth@5.0.0-beta.20.
 
 ## Battle Interface Visualization
-<img src="https://github.com/user-attachments/assets/423adede-b5f2-4cff-ac11-4ca3abcc9e66" alt="Screenshot (342)" width="450"/>
-<img src="https://github.com/user-attachments/assets/dd31c7d2-a1cd-476c-b4b4-ec806cd7e609" alt="Screenshot (344)" width="500"/>
+<img src="https://github.com/user-attachments/assets/423adede-b5f2-4cff-ac11-4ca3abcc9e66" alt="Screenshot (342)" width="400"/>
+<img src="https://github.com/user-attachments/assets/dd31c7d2-a1cd-476c-b4b4-ec806cd7e609" alt="Screenshot (344)" width="450"/>
