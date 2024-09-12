@@ -1,7 +1,7 @@
 import Image from "next/image";
-import LoginForm from "@/components/LoginForm";
-import Logout from "@/components/auth/Logout";
-import { auth } from "@/auth";
+import LoginForm from "../../components/auth/LoginForm";
+import Logout from "../../components/auth/Logout";
+import { auth } from "../../auth";
 
 import { redirect } from "next/navigation";
 
