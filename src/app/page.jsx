@@ -73,18 +73,11 @@ export default async function Home() {
   return (
     <Layout>
       <Header />
-      {/* Load the Google Identity Services script */}
-      <Script
-        src="https://accounts.google.com/gsi/client"
-        strategy="beforeInteractive"
-        onLoad={() => console.log('Google script loaded')}
-      />
+     
       <div className="flex justify-center items-center h-screen bg-dark-slate-gray">
         <div className="text-center">
           <img src="/beatboxlogofinal.svg" alt="BeatBox" width={180} height={37} />
           
-          {/* Render the Google Sign-In Button
-          <div id="google-signin-button"></div> */}
           <LoginForm />
           
           <pre>{/* Display user information here after login */}</pre>
