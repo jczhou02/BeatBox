@@ -12,6 +12,8 @@ const HomePage = async () => {
 
     if (!session?.user) redirect("/");
 
+    // Provide a default fallback image in case the user doesn't have one
+  const userImage = session?.user?.image || "/default-avatar.png"; // Replace with your default avatar image
     return (
         <Layout>
       <Header />
