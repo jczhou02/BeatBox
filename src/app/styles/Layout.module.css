@@ -1,16 +1,71 @@
-/* Layout.module.css */
 .container {
-    display: flex;
+  display: flex;
+  height: 100vh; /* Full viewport height */
+  width: 100vw; /* Full viewport width */
+  flex-direction: row; /* Horizontal layout */
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box; /* Ensure padding and borders are included in the element's total width and height */
+  border: 2px solid red;
+  min-height: 100vh; /* Ensure container takes full height */
   }
   
   .sidenav {
-    width: 125px; /* Adjust width as needed */
-    background-color: #d5d5d5;
+    width: 173px; /* Adjust width as needed */
+    background-color: #2a2f31; /*#d5d5d5;  /*background-color: #2a2a2a; /* Dark */
+    height: 100vh;
+    padding: 20px;
+    flex-shrink: 0; /* Prevent sidebar from shrinking */
+    box-sizing: border-box;
+    border: 2px solid green;
+  }
+
+  .navList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .navItem {
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .navHome {
+    display: flex;
+    align-items: center;
+    justify-content: center; 
+    margin: .5px 0;   
+  }
+  
+  .navLink {
+    display: flex;
+    align-items: center;
+    color: white;
+    text-decoration: none;
+  }
+  
+  .navLink:hover {
+    color: #1db954; /* Spotify green */
+  }
+  
+  .navIcon {
+    margin-right: 10px; /* Space between icon and text */
+    font-size: 20px;
   }
   
   .main-content {
-    flex: 1;
-    padding: 30px; /* Adjust padding as needed */
-    color: black;
+    flex-grow: 1;
+    padding: 20px;
+    width: 100%; /* Ensure main content takes full width */
+    height: 100%; /* Ensure main content takes full height */
+    background-color: #1c1c1c;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid blue;
   }
   

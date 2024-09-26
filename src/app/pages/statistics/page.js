@@ -1,24 +1,23 @@
 import React from "react";
 import { Header } from "../../components/header";
 import Layout from "../../components/layout";
-import LoginForm from "../../../components/auth/LoginForm";
-//import { Battle } from "./components/battle";  // import the Battle component
 import { auth } from "../../auth";
 
-export default async function battle() {
-    const session = await auth();
 
+export default function statistics() {
     return (
         <Layout>
       <Header />
         <div>
             <main>
-                <h1>Battle</h1>
-                <p>Challenge a friend to a BeatBox battle!</p>
+                <h1>My Stats</h1>
+                <p>View your BeatBox battle tendencies... in other words, your favorite songs/artists/genres to use in battle! hehe</p>
             </main>
+        </div>
+        <div>
             <h2>
             {session
-            ? <button type="button" className="btn">Challenge</button>
+            ? 'something'
             : <LoginForm />}
             </h2>
         </div>
