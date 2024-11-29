@@ -26,19 +26,13 @@ html, body {
   }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-.bg-dark-slate-gray {
-  background-color: rgb(47, 106, 79);
-}
-
-body > #__next {
-  height: 100%; /* Ensure Next.js root component takes full height */
-  width: 100%;  /* Ensure Next.js root component takes full width */
-  display: flex;
-  flex-direction: row; /* Make the layout row-based for the sidenav */
+body.dark {
+  background-color: #1a202c; /* Example dark background */
+  color: #e2e8f0; /* Example light text */
 }
