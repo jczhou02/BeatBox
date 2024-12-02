@@ -23,7 +23,7 @@ export default function Statistics() {
 
   const fetchStatistics = async () => {
     const { data, error } = await supabase
-      .from('user_statistics') // Adjust this table name based on your Supabase schema
+      .from('beatboxers') // Adjust this table name based on your Supabase schema
       .select('*')
       .eq('id', session.user.id);
 
@@ -40,8 +40,8 @@ export default function Statistics() {
       {session ? (
         statistics ? (
         <div className="mt-6">
-          <p><strong>Top Artist:</strong> {statistics[0].party_starter}</p>
           <p><strong>Top Genre:</strong> {statistics[0].top_genre}</p>
+          <p><strong>Party Starter:</strong> {statistics[0].party_starter}</p>
           <p><strong>Battles:</strong> {statistics[0].matches_played}</p>
           <p><strong>Wins:</strong> {statistics[0].battles_won}</p>
         </div>
