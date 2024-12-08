@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession, signIn } from 'next-auth/react';
+import Header from '@/components/layout/header';
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -93,6 +94,8 @@ export default function Home() {
   }
 
   return (
+  <div>
+    <Header />
     <div className="p-8 text-center">
       <h1>Welcome, {session?.user?.name}!</h1>
       <p>Your Spotify email: {session?.user?.email}</p>
@@ -127,5 +130,6 @@ export default function Home() {
         )}
       </div>
     </div>
+  </div>
   );
 }

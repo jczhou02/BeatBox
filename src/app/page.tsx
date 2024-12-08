@@ -4,6 +4,7 @@ import { useSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 import {scope} from '@/app/utils/scope';
+import Header from '../components/layout/header';
 
 export default function LandingPage() {
   const { data: session, status } = useSession();
@@ -19,6 +20,8 @@ export default function LandingPage() {
   }, [status, router]);
 
   return (
+  <div>
+    <Header/>
     <div className="flex flex-col justify-center items-center h-screen w-full bg-dark-slate-gray">
       <div className="text-center">
         <img src="/beatboxlogofinal.svg" alt="BeatBox" width={200} height={37} />
@@ -38,5 +41,6 @@ export default function LandingPage() {
         </Suspense>
       </div>
     </div>
+  </div>
   );
 }

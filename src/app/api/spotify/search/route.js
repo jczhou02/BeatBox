@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { authOptions } from '@/app/lib/services/auth'; 
 import redis from '@/app/lib/redis'; // Import your Redis client from lib/redis
 
 const SPOTIFY_CACHE_TTL = 60 * 5; // 5 minutes
@@ -32,7 +31,7 @@ export async function GET(req) {
   // If no cached data, fetch from Spotify
   try {
     const response = await fetch(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=7`,
       {
         headers: {
           Authorization: `Bearer ${session.accessToken}`,
@@ -50,6 +49,7 @@ export async function GET(req) {
 
     // Cache the results
     await redis.set(cacheKey, JSON.stringify(data), 'EX', SPOTIFY_CACHE_TTL);
+    console.log(`Cache set for key: ${cacheKey}`);
 
     return NextResponse.json(data);
   } catch (error) {

@@ -9,3 +9,107 @@
   .animate-shake {
     animation: shake 0.5s ease-in-out;
   }
+
+  .battle-header {
+    max-width: 700px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #2d2f33;
+    padding: 12px 20px;
+    border-radius: 12px;
+  }
+  
+  /* Circle styling for the timer */
+  .timer {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    border-radius: 50%;
+  }
+  
+  .timer.bg-green {
+    background-color: #34d399;
+    animation: flash-green 1s infinite alternate;
+  }
+  
+  .timer.bg-red {
+    background-color: #f87171;
+    animation: flash-red 1s infinite alternate;
+  }
+  
+  @keyframes flash-green {
+    0% {
+      background-color: #34d399;
+    }
+    100% {
+      background-color: #10b981;
+    }
+  }
+  
+  @keyframes flash-red {
+    0% {
+      background-color: #f87171;
+    }
+    100% {
+      background-color: #ef4444;
+    }
+  }
+  
+  /* Style the search bar */
+  .search-bar {
+    display: flex;
+    align-items: center;
+    width: 90%;
+    max-width: 600px;
+    margin: 0 auto;
+    background-color: #2d2f33;
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  
+  .search-bar input {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: white;
+    padding: 8px;
+  }
+  
+  .search-bar button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 8px;
+  }
+  
+  /* Search results container */
+  .search-results {
+    width: 90%;
+    max-width: 600px;
+    margin: 12px auto;
+    margin-top: 1px;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: #2d2f33;
+    border-radius: 8px;
+    padding: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #6b7280 transparent;
+  }
+  
+  .search-results::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .search-results::-webkit-scrollbar-thumb {
+    background: #6b7280;
+    border-radius: 3px;
+  }

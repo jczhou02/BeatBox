@@ -16,13 +16,16 @@ export const {handlers, auth, signIn, signOut,} = NextAuth({
     async jwt({token,trigger,session,account}){
         if (trigger === "update") token.name = session.user.name
         if (account) {
+          console.log("Account details received, updating token.");
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;
-          token.expiresAt = Date.now() + (account.expires_at || 3600) * 1000; // Default to 1 hour
+          token.expiresAt = account.expires_at ? account.expires_at * 1000 : Date.now() + 3600 * 1000;
           return token;
         }
         const expiresAt = token.expiresAt ?? 0;
+        console.log("Time until expiration (in hours):", (token.expiresAt - Date.now()) / (1000 * 3600));
         if (Date.now() < expiresAt) {
+          console.log("JWT Callback: Token is still valid.");
           return token; // Token still valid
         }
       
@@ -81,13 +84,13 @@ async function refreshAccessToken(token: { refreshToken?: string; accessToken?: 
         refresh_token: token.refreshToken,
       }),
     });
-
+    console.log("Refresh response status:", response.status);
     const data = await response.json();
 
     if (!response.ok) {
       throw new Error("Failed to refresh access token");
     }
-
+    console.log("Access token refreshed successfully");
     return {
       ...token,
       accessToken: data.access_token,

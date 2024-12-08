@@ -1,6 +1,10 @@
 // beatbox/src/app/howto/page.tsx
+import Header from '@/components/layout/header';
+
 export default function HowToPlay() {
     return (
+    <div>
+      <Header />
       <div className="p-8 text-center">
         <h1>How to Play</h1>
         <p>Learn the rules and get ready to become a BeatBox master!</p>
@@ -26,6 +30,7 @@ export default function HowToPlay() {
           {/* Optional animations or further instructions */}
         </div>
       </div>
+    </div>
     );
   }
   

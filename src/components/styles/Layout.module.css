@@ -11,7 +11,7 @@
     }
     
     .sidenav {
-      width: 173px; /* Adjust width as needed */
+      width: 127px; /* Adjust width as needed */
       background-color: #2a2f31; /*#d5d5d5;  /*background-color: #2a2a2a; /* Dark */
       height: 100vh;
       padding: 20px;
@@ -58,14 +58,10 @@
     .main-content {
       flex-grow: 1;
       padding: 20px;
-      width: 100%; /* Ensure main content takes full width */
-      height: 100%; /* Ensure main content takes full height */
       background-color: #1c1c1c;
       color: white;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      align-items: center;
       border: 2px solid blue;
     }
     

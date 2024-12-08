@@ -1,6 +1,6 @@
 // beatbox/src/app/statistics/page.tsx
 'use client';
-
+import Header from '@/components/layout/header';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '../../lib/supabaseClient'; // Make sure supabaseClient.js is properly set up
@@ -35,6 +35,8 @@ export default function Statistics() {
   };
 
   return (
+  <div>
+    <Header />
     <div className="p-8 text-center">
       <h1>Your Music Battle Stats</h1>
       {session ? (
@@ -55,5 +57,6 @@ export default function Statistics() {
         </div>
       )}
     </div>
+  </div>
   );
 }

@@ -10,7 +10,7 @@ const Sidebar = ({ children }) => {
           {/* BeatBox Logo redirects to home */}
           <li className={styles.navHome}>
             <Link href="/home">
-              <img src="/beatboxlogofinal_nav.svg" alt="BeatBox" width={120} height={25} />
+              <img src="/beatboxlogofinal_nav.svg" alt="BeatBox" width={60} />
             </Link>
           </li>
 

@@ -1,42 +1,23 @@
-let usedArtists = {}; 
-let usedGenres = {}
-let streak = 0;       // Player's current streak ; good for singlePlayer
-let battleWon = false;         
-let session = {};
-
-function startBattle() {
-  // Reset game state
-  usedArtists = {};
-  usedGenres = {};
-  streak = 0;
-  battleWon = false;
+function updateUsage(usage, key) {
+  return {
+    ...usage,
+    [key]: (usage[key] || 0) + 1,
+  };
 }
 
-function updateArtistUsage(artistId) {
-    usedArtists[artistId] = (usedArtists[artistId] || 0) + 1;
+function validateSong(newSong, currentSong, firstSong, usedArtists) {
+  // first, if newSong has only one artist then return false
+  if (newSong.artists.length < 2) {
+    return false;
   }
-
-function updateGenreUsage(genre) { 
-    genreUsage[genre] = (genreUsage[genre] || 0) + 1;
-    }
-  
-function useSong(song) {
-  const artists = song.artists.map(artist => artist.id);
-
-  // genre = ...   use outside api to convert song title to genre
-  artists.forEach(artist => updateArtistUsage(artist));
-  //updateGenreUsage(genre);
-
-  streak++;
-  startTimer();
-}
-
-function validateSong(newSong, currentSong) {
+  if (firstSong) {
+    return true;
+  }
   const currentArtists = currentSong?.artists.map((artist) => artist.id) || [];
   const newArtists = newSong.artists.map(artist => artist.id);
 
   // Check artist overlap and usage limit
-  const validArtist = newArtists.some(artist => currentArtists.includes(artist) && (usedArtists[artist] || 0) < 3);
+  const validArtist = newArtists.some(artist => currentArtists.includes(artist) && (usedArtists[artist] || 0) < 3);  
   if (!validArtist) {
     return false;
   }
@@ -45,9 +26,9 @@ function validateSong(newSong, currentSong) {
 }
 
 
-function endGame(battleWon) {
+function endGame(battleWon, streak) {
   console.log(`Game Over! Final Streak: ${streak}`);
- //saveBattle(battleWon);
+  //saveBattle(battleWon);
 }
 
 const saveBattle = async (battleWon) => {
@@ -62,7 +43,7 @@ const saveBattle = async (battleWon) => {
           artistUsage: usedArtists,
           genreUsage: usedGenres,
           battleWon: battleWon,
-          streak,
+          streak: streak,
         }),
       });
   
@@ -76,8 +57,7 @@ const saveBattle = async (battleWon) => {
   
 
   export {
-    startBattle,
+    updateUsage,
     validateSong,
-    useSong,
     endGame,
   };

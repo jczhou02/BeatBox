@@ -10,12 +10,11 @@ import { ReactNode } from 'react';
 
 export default function ClientProviders({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <Provider store={store}>
         <div className="flex h-screen">
           <Sidebar>
-            <Header/>
-                {children}
+            {children}
           </Sidebar>
         </div>
       </Provider>
