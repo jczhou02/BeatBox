@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import redis from '@/app/lib/redis'; // Import your Redis client from lib/redis
 
-const SPOTIFY_CACHE_TTL = 60 * 5; // 5 minutes
+const SPOTIFY_CACHE_TTL = 60 * 15; // 5 minutes
 
 export async function GET(req) {
   // Extract query parameter from the request

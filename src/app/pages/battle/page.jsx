@@ -54,6 +54,9 @@ export default function BattlePage() {
       setSearchResults([]);    
       endGame(false, streak);
     }
+    if (timer === 0 && gameState === 'inBattle') {
+      console.log('songHistory:', songHistory);
+    }
   }, [timer]);
 
   useEffect(() => {
@@ -141,6 +144,28 @@ export default function BattlePage() {
       triggerShake();
     }
   };
+
+  const handleSaveBattle = async () => {
+    try {
+      const response = await fetch('/api/battle/saveBattle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          songHistory: songHistory,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Error saving battle:', await response.json());
+      }
+    } catch (error) {
+      console.error('Save battle error:', error);
+    }
+  }
+
+
   const triggerShake = () => {
     setShake(true);
     setTimeout(() => setShake(false), 500); // Reset the shake animation after 500ms
@@ -199,7 +224,7 @@ export default function BattlePage() {
             streak={streak}
             usedArtists={usedArtists.length}
             usedGenres={usedGenres.length}
-            onSave={() => console.log('Saving this legendary battle...')}
+            onSave={() => handleSaveBattle}
             onPlayAgain={() => reset(true)}
             onReturnToLobby={() => reset(false)}   
           />
