@@ -8,3 +8,4 @@ I was able to get the development servers and Next routing working using next-au
 ## Battle Interface Visualization
 <img src="https://github.com/user-attachments/assets/423adede-b5f2-4cff-ac11-4ca3abcc9e66" alt="Screenshot (342)" width="400"/>
 <img src="https://github.com/user-attachments/assets/dd31c7d2-a1cd-476c-b4b4-ec806cd7e609" alt="Screenshot (344)" width="450"/>
+<img width="500" alt="BeatBox-batchupdates" src="https://github.com/user-attachments/assets/097263cc-09cd-408a-82ca-261d1e28121e" />
