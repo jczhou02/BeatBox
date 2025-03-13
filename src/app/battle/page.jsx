@@ -113,7 +113,7 @@ export default function BattlePage() {
   }, 105); // Adjust debounce delay as needed (300ms is standard)
 
     
-  function useSong(song) {
+  function handleSong(song) {
     const artists = song.artists.map((artist) => artist.name);
     // Update artist usage
     let newUsedArtists = { ...usedArtists };
@@ -132,7 +132,7 @@ export default function BattlePage() {
     const isValid = validateSong(song, currentSong, firstSong, usedArtists);
     if (isValid) {
       setError('');
-      useSong(song);
+      handleSong(song);
       setCurrentSong(song);
       setSongHistory((prev) => [song, ...prev]);
       setTimer(30);

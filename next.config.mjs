@@ -12,4 +12,12 @@ const nextConfig = {
   
   };
   
-  export default nextConfig;
+//   export default nextConfig;
+// File: next.config.js
+// /** @type {import('next').NextConfig} */
+// const nextConfig = {
+//   reactStrictMode: true,
+//   swcMinify: true,
+// }
+
+// module.exports = nextConfig

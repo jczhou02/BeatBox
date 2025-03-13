@@ -3,36 +3,16 @@
 @tailwind utilities;
 
 html, body {
-  height: 100%;
-  width: 100%;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  background-color: black;
+  height: 100%;
+  width: 100%;
 }
 
-:root {
-  --foreground-rgb: 158,145,126;
-  --background-start-rgb: 0, 0, 0;
-  --background-end-rgb: 192,192,192;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 192, 192, 192;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-body.dark {
-  background-color: #1a202c; /* Example dark background */
-  color: #e2e8f0; /* Example light text */
-}
+/* If you want a universal dark background, you can keep this,
+   but it will override child backgrounds unless you specifically
+   use a larger container with its own background. 
+   If you want your DAW gradient to show, you might remove it. */
+/* body {
+  background-color: #1c1c1c; 
+} */

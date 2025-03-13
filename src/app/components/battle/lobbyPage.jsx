@@ -1,6 +1,7 @@
 'use client';
 
 import { useSession, signIn } from 'next-auth/react';
+import SignInButton from '@/components/auth/signIn';
 
 export default function Lobby({onStartBattle}) {
   const { data: session, status } = useSession();
@@ -24,12 +25,14 @@ export default function Lobby({onStartBattle}) {
           Start a Battle!
         </button>
       ) : (
-        <button
-          onClick={() => signIn('spotify')}
-          className="mt-6 bg-green-500 text-white px-4 py-2 rounded"
-        >
-          Login with Spotify to Battle
-        </button>
+        <div className="text-center p-8">
+          <h1 className="text-xl font-semibold mb-4">
+            You need to sign in to battle.
+          </h1>
+          <div className="flex justify-center">
+            <SignInButton />
+          </div>
+        </div>
       )}
     </div>
   );

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import Header from '@/components/layout/header';
+import SignInButton from '@/components/auth/signIn';
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -82,15 +83,14 @@ export default function Home() {
 
   if (status === 'unauthenticated') {
     return (
-      <div className="p-8 text-center">
-        <p>You need to sign in to access this page.</p>
-        <button
-          onClick={() => signIn('spotify')}
-          className="mt-4 bg-green-500 text-white px-4 py-2 rounded"
-        >
-          Sign in with Spotify
-        </button>
-      </div>
+      <div className="text-center p-8">
+          <h1 className="text-xl font-semibold mb-4">
+            You need to sign in to access your homepage.
+          </h1>
+          <div className="flex justify-center">
+            <SignInButton />
+          </div>
+        </div>
     );
   }
 

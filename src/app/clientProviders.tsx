@@ -1,21 +1,24 @@
-// app/ClientProviders.tsx
+// src/app/clientProviders.tsx
 'use client';
 
 import { Provider } from 'react-redux';
 import { SessionProvider } from 'next-auth/react';
 import store from './redux/store/store';
 import Sidebar from '../components/layout/sidebar';
-import Header from '../components/layout/header';
 import { ReactNode } from 'react';
 
 export default function ClientProviders({ children }: { children: ReactNode }) {
   return (
     <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <Provider store={store}>
-        <div className="flex h-screen">
-          <Sidebar>
+        {/* Full-screen flex container: sidebar on left, content on right */}
+        <div className="flex h-screen w-screen overflow-hidden">
+          <Sidebar />
+
+          {/* Main content: grows to fill the rest of the space */}
+          <main className="flex-1 overflow-auto">
             {children}
-          </Sidebar>
+          </main>
         </div>
       </Provider>
     </SessionProvider>

@@ -10,16 +10,16 @@ export default function Statistics() {
   const { data: session, status } = useSession();
   const [statistics, setStatistics] = useState(null);
 
-  if (status === 'loading') {
-    return <p>Loading...</p>;
-  }
-
   useEffect(() => {
     if (session) {
       console.log(session.user.id);
       fetchStatistics();
     }
   }, [session]);
+
+  if (status === 'loading') {
+    return <p>Loading...</p>;
+  }
 
   const fetchStatistics = async () => {
     const { data, error } = await supabase
@@ -51,9 +51,13 @@ export default function Statistics() {
         <p>Loading your statistics...</p>
       )
       ) : (
-        <div className="text-center">
-          <h1 className="text-xl font-semibold mb-4">You need to sign in to access this page.</h1>
-          <SignInButton />
+        <div className="text-center p-8">
+          <h1 className="text-xl font-semibold mb-4">
+            You need to sign in to access your stats.
+          </h1>
+          <div className="flex justify-center">
+            <SignInButton />
+          </div>
         </div>
       )}
     </div>

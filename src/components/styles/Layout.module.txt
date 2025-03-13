@@ -1,12 +1,9 @@
 .container {
-    display: flex;
-    height: 100vh; /* Full viewport height */
-    width: 100vw; /* Full viewport width */
-    flex-direction: row; /* Horizontal layout */
+    /* flex-direction: row; /* Horizontal layout */
     margin: 0;
     padding: 0;
     box-sizing: border-box; /* Ensure padding and borders are included in the element's total width and height */
-    border: 2px solid red;
+    /* border: 2px solid red; */
     min-height: 100vh; /* Ensure container takes full height */
     }
     
@@ -17,7 +14,7 @@
       padding: 20px;
       flex-shrink: 0; /* Prevent sidebar from shrinking */
       box-sizing: border-box;
-      border: 2px solid green;
+      /* border: 2px solid green; */
     }
   
     .navList {
@@ -62,6 +59,6 @@
       color: white;
       display: flex;
       flex-direction: column;
-      border: 2px solid blue;
+      /* border: 2px solid blue; */
     }
     

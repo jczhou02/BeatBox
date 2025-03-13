@@ -1,50 +1,43 @@
-import styles from '../styles/Layout.module.css';
-import { FaQuestionCircle, FaGamepad, FaChartBar } from 'react-icons/fa';
 import Link from 'next/link';
+import { FaQuestionCircle, FaGamepad, FaChartBar, FaCompactDisc } from 'react-icons/fa';
 
-const Sidebar = ({ children }) => {
+export default function Sidebar() {
   return (
-    <div className={styles.container}>
-      <nav className={styles.sidenav}>
-        <ul className={styles.navList}>
-          {/* BeatBox Logo redirects to home */}
-          <li className={styles.navHome}>
-            <Link href="/home">
-              <img src="/beatboxlogofinal_nav.svg" alt="BeatBox" width={60} />
-            </Link>
-          </li>
+    <div className="w-40 bg-[#2a2f31] p-4 flex-shrink-0">
+      <ul className="space-y-6">
+        {/* Logo */}
+        <li className="flex justify-center">
+          <Link href="/home">
+            <img src="/beatboxlogofinal_nav.svg" alt="BeatBox" width={60} />
+          </Link>
+        </li>
 
-          {/* How to Play with Icon */}
-          <li className={styles.navItem}>
-            <Link href="/pages/howto" className={styles.navLink}>
-              <FaQuestionCircle className={styles.navIcon} />
-              <span>How to Play</span>
-            </Link>
-          </li>
-
-          {/* Battle Link with Icon */}
-          <li className={styles.navItem}>
-            <Link href="/pages/battle" className={styles.navLink}>
-              <FaGamepad className={styles.navIcon} />
-              <span>Battle</span>
-            </Link>
-          </li>
-
-          {/* Statistics Link with Icon */}
-          <li className={styles.navItem}>
-            <Link href="/pages/statistics" className={styles.navLink}>
-              <FaChartBar className={styles.navIcon} />
-              <span>Statistics</span>
-            </Link>
-          </li>
-        </ul>
-      </nav>
-
-      <main className={styles['main-content']}>
-        {children}
-      </main>
+        {/* Nav Items */}
+        <li className="flex items-center">
+          <Link href="/howto" className="flex items-center text-white hover:text-green-400">
+            <FaQuestionCircle className="mr-2" />
+            <span>How to Play</span>
+          </Link>
+        </li>
+        <li className="flex items-center">
+          <Link href="/battle" className="flex items-center text-white hover:text-green-400">
+            <FaGamepad className="mr-2" />
+            <span>Battle</span>
+          </Link>
+        </li>
+        <li className="flex items-center">
+          <Link href="/statistics" className="flex items-center text-white hover:text-green-400">
+            <FaChartBar className="mr-2" />
+            <span>Statistics</span>
+          </Link>
+        </li>
+        <li className="flex items-center">
+          <Link href="/dabi" className="flex items-center text-white hover:text-green-400">
+            <FaCompactDisc className="mr-2" />
+            <span>Dabi</span>
+          </Link>
+        </li>
+      </ul>
     </div>
   );
-};
-
-export default Sidebar;
+}

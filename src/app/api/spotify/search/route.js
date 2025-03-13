@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import redis from '@/app/lib/redis'; // Import your Redis client from lib/redis
+import redis from '@/lib/redis'; // Import your Redis client from lib/redis
 
 const SPOTIFY_CACHE_TTL = 60 * 15; // 5 minutes
 

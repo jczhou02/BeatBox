@@ -7,11 +7,14 @@ import { scope } from '@/app/utils/scope';
 export const {handlers, auth, signIn, signOut,} = NextAuth({
   providers: [SpotifyProvider({ authorization: `https://accounts.spotify.com/authorize?scope=${scope}`,})],
   adapter: SupabaseAdapter({
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    secret: process.env.NEXT_PUBLIC_SUPABASE_SERVICE_KEY,
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    secret: process.env.NEXT_PUBLIC_SUPABASE_SERVICE_KEY || '',
   }),
   secret: process.env.AUTH_SECRET,
   session: { strategy: "jwt" },
+  pages: {
+    signIn: "/auth/signin",
+  },
   callbacks: {
     async jwt({token,trigger,session,account}){
         if (trigger === "update") token.name = session.user.name
