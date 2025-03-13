@@ -1,7 +1,6 @@
 'use client';
 
-import { useSession, signIn } from 'next-auth/react';
-import SignInButton from '@/components/auth/signIn';
+import { useSession } from 'next-auth/react';
 
 export default function Lobby({onStartBattle}) {
   const { data: session, status } = useSession();
@@ -18,7 +17,11 @@ export default function Lobby({onStartBattle}) {
         <li>💥 Songs can be used up to three times, so choose wisely!</li>
       </ul>
 
-      {status === 'loading' ? (
+      <button onClick={onStartBattle} className="mt-6 bg-blue-500 text-white px-4 py-2 rounded">
+          Start a Battle!
+        </button>
+
+      {/* {status === 'loading' ? (
         <p>Loading...</p>
       ) : session ? (
         <button onClick={onStartBattle} className="mt-6 bg-blue-500 text-white px-4 py-2 rounded">
@@ -33,7 +36,7 @@ export default function Lobby({onStartBattle}) {
             <SignInButton />
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

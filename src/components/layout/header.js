@@ -2,7 +2,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import ToggleDarkMode from './darkmodetoggle';
+import ToggleSound from './toggleSound';
 import { signOut } from 'next-auth/react';
 
 const Header = () => {
@@ -16,7 +16,7 @@ const Header = () => {
           : 'Welcome to BeatBox! Please sign into your Spotify account and prepare for battle 🎵'}
       </div>
       <div className="ml-auto flex items-center space-x-4">
-        <ToggleDarkMode />
+        <ToggleSound />
         {session && (
           <button onClick={() => signOut({ callbackUrl: '/' })} className="bg-red-500 text-white px-3 py-1 rounded">
             Sign out

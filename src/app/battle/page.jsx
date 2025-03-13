@@ -4,7 +4,7 @@ import './battle.css';
 import BattleOverCard from '@/app/components/battle/battleOverCard';
 import debounce from 'lodash.debounce';
 import Header from '@/components/layout/header';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef} from 'react';
 import { useSession } from 'next-auth/react';
 import { updateUsage, validateSong, endGame } from '@/app/utils/battle/battle'; // Utils functions
 import SongCard from '@/app/components/battle/songCard'; // A reusable component for displaying song info
@@ -91,12 +91,21 @@ export default function BattlePage() {
   const handleSearch = async (query) => {
     setSearchQuery(query);
   };
+  const controllerRef = useRef(null); 
 
+  
   const debouncedSearch = debounce(async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
       return;
     }
+
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    controllerRef.current = controller;
 
     try {
       const response = await fetch(`/api/spotify/search?query=${encodeURIComponent(query)}`);
@@ -110,7 +119,7 @@ export default function BattlePage() {
     } catch (error) {
       console.error('Search error:', error);
     }
-  }, 105); // Adjust debounce delay as needed (300ms is standard)
+  }, 300); // Adjust debounce delay as needed (300ms is standard)
 
     
   function handleSong(song) {

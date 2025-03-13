@@ -7,7 +7,7 @@ export default function Daw() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
       <div className="container mx-auto px-4 py-16">
         <h1 className="text-5xl font-bold mb-8">Dabi</h1>
-        <p className="text-xl mb-8">Daw X BeatBox. Own the night (or day!) with our beginner-friendly digital audio workstation. Whether your an seasoned DJ, edm enthusiast, or 2000s kid, Dabi is here to mashup, remix, and curated custom playlists tailored personally to any theme you desire.</p>
+        <p className="text-xl mb-8">Daw X BeatBox. Own the night (or day!) with our beginner-friendly digital audio workstation. Whether your a seasoned DJ, edm enthusiast, or 2000s kid, Dabi is here to mashup, remix, and curated custom playlists tailored personally to any theme you desire.</p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <Link href="/dabi/untitled">

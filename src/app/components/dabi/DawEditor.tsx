@@ -4,10 +4,11 @@ import { TransportControls } from './TransportControls';
 import { TrackList } from './TrackList';
 import { UploadArea } from './UploadArea';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
+import BottomMusicBar from './BottomMusicBar';
 
 interface DawEditorProps {
   initialProject: Project;
-  onSave?: (project: Project) => void; 
+  onSave: (project: Project) => void; 
   // You can pass an optional callback to "save" the project if you want
   isNew?: boolean; 
   // Maybe you want to treat new projects differently
@@ -133,15 +134,20 @@ export const DawEditor: React.FC<DawEditorProps> = ({
         <h1 className="text-2xl font-bold text-white">
           {project.name}{isNew ? ' *' : ''}
         </h1>
-        {/* If you have a "Save" button: */}
-        {onSave && (
+        <div className='flex space-x-2'>
+        <button
+              className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white"
+              onClick={() => setShowUpload(true)}
+            >
+              Add Tracks
+            </button>
           <button
             className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white"
             onClick={() => onSave(project)}
           >
             Save
           </button>
-        )}
+        </div>
       </header>
 
       {/* Transport controls */}
@@ -157,18 +163,7 @@ export const DawEditor: React.FC<DawEditorProps> = ({
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-white">Tracks</h2>
           <div className="flex space-x-2">
-            <button
-              className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white"
-              onClick={() => setShowUpload(true)}
-            >
-              Add Tracks
-            </button>
-            <button
-              className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-white"
-              onClick={handleSpotifyImport}
-            >
-              Import from Spotify
-            </button>
+            
           </div>
         </div>
 
@@ -207,6 +202,13 @@ export const DawEditor: React.FC<DawEditorProps> = ({
           </div>
         </div>
       )}
+
+        <div className="relative h-full">
+        {/* Your existing DAW editor content */}
+        
+        {/* Add the BottomMusicBar component at the end */}
+        <BottomMusicBar />
+        </div>
     </div>
   );
 };
