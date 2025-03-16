@@ -1,4 +1,5 @@
 import './songCard.css';
+import Image from 'next/image';
 
 const trimFeatArtists = (trackTitle) => {
   return trackTitle
@@ -17,7 +18,7 @@ export default function SongCard({ song, onSelect }) {
     className="song-card flex items-center p-2 border-b border-gray-700 hover:bg-gray-800 cursor-pointer"
     onClick={onSelect}
     >
-      <img
+      <Image
         src={song.album?.images?.[0]?.url || '/default-album.png'}
         alt={song.name}
         width={32}

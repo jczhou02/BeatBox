@@ -19,7 +19,7 @@ export default function Sidebar() {
   };
 
   return ( 
-    <div className={`bg-[#2a2f31] p-4 flex-shrink-0 transition-all duration-300 ${isOpen ? 'w-40' : 'w-18'}`}> 
+    <div className={`bg-[#181c1d] p-4 flex-shrink-0 transition-all duration-300 ${isOpen ? 'w-40' : 'w-18'}`}> 
       <div className="flex flex-col">
         <ul className="space-y-6 flex-grow"> 
           {/* Logo */} 

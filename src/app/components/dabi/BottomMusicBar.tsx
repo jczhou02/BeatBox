@@ -1,26 +1,93 @@
 // src/components/layout/BottomMusicBar.tsx
-import { useState, useRef, useEffect } from 'react';
-import { FaMusic, FaList, FaSearch } from 'react-icons/fa';
+import { useState, useRef, useEffect, memo } from 'react';
+import { FaMusic, FaList } from 'react-icons/fa';
 import { useSession } from 'next-auth/react';
 import debounce from 'lodash.debounce';
+import Image from 'next/image';
+import { DragDropContext, Droppable, DroppableProps, Draggable, DropResult } from 'react-beautiful-dnd';
+import { SongTabPlayback } from '@/components/layout/SpotifyPlayerProvider';
 
+  // Declare global types for Spotify Web Playback SDK.
+  declare global {
+    interface Window {
+      onSpotifyWebPlaybackSDKReady: () => void;
+      Spotify: any;
+    }
+  }
+interface Track {
+  id?: string;
+  name: string;
+  artists: Array<{ name: string }>;
+  album?: { images?: Array<{ url: string }> };
+  uri?: string; // added for Spotify Web Playback SDK
+}
 
-export default function BottomMusicBar() {
-  const minHeight = 40; // Height when closed
+interface TabAdd {
+  type: 'add';           // special tab type for "Add" UI
+  mode: 'track' | 'playlist'; // whether it's showing track or playlist UI
+  title: string;         // e.g. "Add Track" or "Add Playlist"
+}
+
+interface TabSong {
+  type: 'song'; // tab with a track
+  track: Track;
+}
+
+type Tab = TabAdd | TabSong;
+
+export const StrictModeDroppable = ({ children, ...props }: DroppableProps) => {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const animation = requestAnimationFrame(() => setEnabled(true));
+    return () => {
+      cancelAnimationFrame(animation);
+      setEnabled(false);
+    };
+  }, []);
+
+  if (!enabled) {
+    return null;
+  }
+  return <Droppable {...props}>{children}</Droppable>;
+};
+
+interface BottomMusicBarProps {
+  softTracks: Track[];                     
+  setSoftTracks: React.Dispatch<React.SetStateAction<Track[]>>; 
+}
+
+export default function BottomMusicBar({ softTracks, setSoftTracks }: BottomMusicBarProps) {
+  const minHeight = 40;        // Height when closed
   const defaultOpenHeight = 256; // Default height when opened
-  
+
   // Height management states
   const [height, setHeight] = useState(minHeight);
   const [openHeight, setOpenHeight] = useState(defaultOpenHeight);
-  
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('song'); // 'song' or 'playlist'
+
+  // We'll keep a "tabs" array in state:
+  // Index 0 is always our "Add" tab (cannot be closed).
+  // Additional indexes are "song" tabs that can be closed and (now) reordered.
+  const [tabs, setTabs] = useState<Tab[]>([
+    {
+      type: 'add',
+      mode: 'track',
+      title: 'Add Track',
+    },
+  ]);
+
+  // The index of whichever tab is currently active
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
+
+  // Search states (only relevant if the active tab is the "Add" tab and mode=track)
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  
+  const [searchResults, setSearchResults] = useState<Track[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
   const { data: session } = useSession();
-  
-  // Refs for drag handling
+
+  // Refs for drag handling (the bar, not the tabs)
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
@@ -30,11 +97,9 @@ export default function BottomMusicBar() {
   // Toggle between open and closed states only if not a drag
   const toggleBar = () => {
     if (hasDraggedRef.current) {
-      // Reset the flag so that future clicks can work normally
       hasDraggedRef.current = false;
       return;
     }
-    
     const newIsOpen = !isOpen;
     setIsOpen(newIsOpen);
     setHeight(newIsOpen ? openHeight : minHeight);
@@ -44,13 +109,10 @@ export default function BottomMusicBar() {
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Reset drag flag at start of a new drag
     hasDraggedRef.current = false;
     isDraggingRef.current = true;
     startYRef.current = e.clientY;
     startHeightRef.current = height;
-    
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
@@ -58,25 +120,17 @@ export default function BottomMusicBar() {
   // Dragging logic with free, fluid height adjustment
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDraggingRef.current) return;
-    
     const deltaY = startYRef.current - e.clientY;
-    
-    // If the mouse has moved more than 5px, consider it a drag
     if (Math.abs(e.clientY - startYRef.current) > 5) {
       hasDraggedRef.current = true;
     }
-    
-    // Calculate the new height; allow dragging up to the viewport height
     const newHeight = Math.max(minHeight, Math.min(startHeightRef.current + deltaY, window.innerHeight));
     setHeight(newHeight);
-    
-    // Mark as open if taller than the minimum height
     setIsOpen(newHeight > minHeight);
-    
     document.body.style.cursor = 'ns-resize';
   };
 
-  // End dragging; no snapping logic here
+  // End dragging
   const handleMouseUp = () => {
     isDraggingRef.current = false;
     document.removeEventListener('mousemove', handleMouseMove);
@@ -91,7 +145,6 @@ export default function BottomMusicBar() {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, []);
-  
 
   // Update height if the open state changes externally
   useEffect(() => {
@@ -100,159 +153,381 @@ export default function BottomMusicBar() {
     }
   }, [isOpen, openHeight]);
 
+  // ----- SEARCH LOGIC -----
   useEffect(() => {
-    if (searchQuery === '') {
+    if (!searchQuery.trim()) {
       setSearchResults([]);
-    } else {
-      debouncedSearch(searchQuery);
+      return;
     }
-    return () => debouncedSearch.cancel(); // Clean up debounce
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    debouncedSearch(searchQuery);
+    return () => debouncedSearch.cancel();
   }, [searchQuery]);
 
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-  };
   const controllerRef = useRef<AbortController | null>(null);
-  const debouncedSearch = debounce(async (query) => {
-     if (!query.trim()) {
-       setSearchResults([]);
-       return;
-     }
- 
-     if (controllerRef.current) {
-       controllerRef.current.abort();
-     }
- 
-     const controller = new AbortController();
-     controllerRef.current = controller;
- 
-     try {
-       const response = await fetch(`/api/spotify/search?query=${encodeURIComponent(query)}`);
-       if (response.ok) {
-         const data = await response.json();
-         setSearchResults(data.tracks?.items || []);
-       } else {
-         const error = await response.json();
-         console.error('Search error:', error.message || 'Unknown error');
-       }
-     } catch (error) {
-       console.error('Search error:', error);
-     }
-   }, 300); // Adjust debounce delay as needed (300ms is standard)
+  const debouncedSearch = debounce(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    try {
+      const res = await fetch(`/api/spotify/search?query=${encodeURIComponent(query)}`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        console.error('Search error:', error.message || 'Unknown error');
+        return;
+      }
+      const data = await res.json();
+      setSearchResults(data.tracks?.items || []);
+      setHighlightedIndex(0);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        // Ignore abort errors
+        return;
+      }
+      console.error('Search error:', err);
+    }
+  }, 300);
+  
 
-  const handleAddTrack = async (track: any) => {
-    console.log('Adding track:', track);
-    // Your logic to add the track goes here
+  // "Soft add" a track to parent's state and create a new "song tab"
+  const handleAddTrack = (track: Track) => {
+    const duplicateIndex = tabs.findIndex(
+      (tab) => tab.type === 'song' && tab.track.id === track.id
+    );
+  
+    if (duplicateIndex !== -1) {
+      // Optionally switch to the existing tab
+      setActiveTabIndex(duplicateIndex);
+      return; // Exit without adding a duplicate
+    }
+
+    // Otherwise...
+    // Add to parent's array
+    setSoftTracks((prev) => [...prev, track]);
+
+    // Also create a new "song tab" for it
+    setTabs((prev) => [
+      ...prev,
+      { type: 'song', track },
+    ]);
+    // Switch to that new tab
+    // setActiveTabIndex(tabs.length);
+  };
+
+  // Remove a “song tab”
+  const handleRemoveTab = (index: number) => {
+    // If it’s the “Add” tab (index=0), do nothing
+    if (index === 0) return;
+    setTabs((prev) => {
+      const newTabs = [...prev];
+      newTabs.splice(index, 1);
+      return newTabs;
+    });
+    if (activeTabIndex === index) {
+      setActiveTabIndex(0);
+    } else if (activeTabIndex > index) {
+      setActiveTabIndex((prev) => prev - 1);
+    }
+  };
+
+  // Helper to update the "Add" tab's mode (track vs playlist)
+  const setAddTabMode = (mode: 'track' | 'playlist') => {
+    setTabs((prev) => {
+      const newTabs = [...prev];
+      if (newTabs[0].type === 'add') {
+        newTabs[0].mode = mode;
+        newTabs[0].title = mode === 'track' ? 'Add Track' : 'Add Playlist';
+      }
+      return newTabs;
+    });
+  };
+
+  // ----- DRAG AND DROP FOR SONG TABS -----
+  // We keep the first (Add) tab fixed and allow dragging only for the song tabs (tabs.slice(1))
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const sourceIndex = result.source.index; // index within the song tabs (tabs.slice(1))
+    const destinationIndex = result.destination.index;
+    const songTabs = tabs.slice(1);
+    const [removed] = songTabs.splice(sourceIndex, 1);
+    songTabs.splice(destinationIndex, 0, removed);
+    const newTabs = [tabs[0], ...songTabs];
+    setTabs(newTabs);
+
+    // Update activeTabIndex if necessary (adjust for the fixed "Add" tab)
+    if (activeTabIndex > 0) {
+      const currentActiveTab = tabs[activeTabIndex];
+      const newActiveIndex = songTabs.findIndex(
+        (tab) =>
+          tab.type === 'song' &&
+          tab.track.id === (currentActiveTab as TabSong).track.id
+      );
+      if (newActiveIndex !== -1) {
+        setActiveTabIndex(newActiveIndex + 1);
+      }
+    }
+  };
+  
+  
+  // Render the main content area for whichever tab is active
+  const renderTabContent = () => {
+    const currentTab = tabs[activeTabIndex];
+
+    // If it's the "Add" tab
+    if (currentTab.type === 'add') {
+      if (currentTab.mode === 'track') {
+        return (
+          <div className="flex flex-col w-full h-full -mt-1">
+            <div className="flex mb-4">
+              <input
+                type="text"
+                placeholder="Search for a track..."
+                className="flex-1 p-2 bg-[#202324] text-white rounded-l outline-none"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (searchResults.length > 0) {
+                      handleAddTrack(searchResults[highlightedIndex]);
+                    }
+                    e.preventDefault();
+                  } else if (e.key === 'ArrowDown') {
+                    setHighlightedIndex((prev) => Math.min(prev + 1, searchResults.length - 1));
+                    e.preventDefault();
+                  } else if (e.key === 'ArrowUp') {
+                    setHighlightedIndex((prev) => Math.max(prev - 1, 0));
+                    e.preventDefault();
+                  }
+                }}
+              />
+              <button
+                onClick={() => setSearchQuery('')}
+                className="px-3 bg-[#202324] text-white rounded-r hover:bg-gray-600"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 no-scrollbar" style={{ maxHeight: `${Math.max(height - 150, 0)}px` }}>
+              {searchResults.length > 0 ? (
+                <ul className="divide-y divide-gray-800">
+                  {searchResults.map((track, i) => (
+                    <li
+                      key={track.id || i}
+                      className={`py-1.5 px-1 flex text-white cursor-pointer transition-colors 
+                        ${i === highlightedIndex ? 'bg-gray-700' : 'hover:bg-gray-600'}`}
+                      onClick={() => handleAddTrack(track)}
+                      onMouseEnter={() => setHighlightedIndex(i)}
+                    >
+                      <div className="flex items-center">
+                        <Image
+                          src={track.album?.images?.[0]?.url || '/default-album.png'}
+                          alt={track.name}
+                          width={40}
+                          height={40}
+                          className="w-11 h-11 rounded mr-4"
+                        />
+                        <div>
+                          <div className="font-medium">{track.name}</div>
+                          <div className="text-sm text-gray-400">
+                            {track.artists.map((a) => a.name).join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : searchQuery ? (
+                <p className="text-gray-400">No tracks found</p>
+              ) : (
+                <p className="text-gray-500">Type to search...</p>
+              )}
+            </div>
+          </div>
+        );
+      } else {
+        // "Add Playlist" mode
+        return (
+          <div className="flex flex-col w-full h-full">
+            <h3 className="text-white text-lg mb-3">Add Playlist</h3>
+            {!session ? (
+              <p className="text-gray-400">Login required to access playlists</p>
+            ) : (
+              <p className="text-gray-400">Playlist functionality coming soon.</p>
+            )}
+          </div>
+        );
+      }
+    }
+
+    // If it's a "song" tab, show playback details for that track
+    if (currentTab.type === 'song') {
+      const { track } = currentTab;
+      return (
+        <div className="flex flex-col w-full h-full">
+          <h3 className="text-white text-lg mb-3">{track.name}</h3>
+          <p className="text-sm text-gray-400 mb-3">
+            Artist(s): {track.artists.map((a) => a.name).join(', ')}
+          </p>
+          <SongTabPlayback track={track} />
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
-    <div 
+    <div
       ref={barRef}
       className="fixed bottom-0 left-0 right-0 bg-[#0c0d0e]"
-      style={{ 
+      style={{
         height: `${height}px`,
-        transition: isDraggingRef.current ? 'none' : 'height 0.2s ease-out'
+        transition: isDraggingRef.current ? 'none' : 'height 0.2s ease-out',
       }}
     >
+      {/* Top drag handle */}
       <div className="h-10 w-full relative flex justify-center items-center" onClick={toggleBar}>
-      <div 
-        className="w-[450px] h-2 bg-gray-600 rounded-full cursor-ns-resize hover:bg-gray-500 transition-colors"
-        onMouseDown={handleMouseDown}
-        onClick={(e) => {
-          if (hasDraggedRef.current) {
-            // Prevent a click from toggling after a drag.
-            hasDraggedRef.current = false;
-            e.stopPropagation();
-            return;
-          }
-          toggleBar();
-        }}
-      ></div>
-    </div>
+        <div
+          className="w-[450px] h-2 bg-gray-600 rounded-full cursor-ns-resize hover:bg-gray-500 transition-colors"
+          onMouseDown={handleMouseDown}
+          onClick={(e) => {
+            if (hasDraggedRef.current) {
+              hasDraggedRef.current = false;
+              e.stopPropagation();
+              return;
+            }
+            toggleBar();
+          }}
+        />
+      </div>
 
       {/* Content area (visible when open) */}
-      {isOpen && (
-        <div className="flex h-full" style={{ height: `calc(100% - 10px)` }}>
-          {/* Sidebar */}
+        <div className="flex h-full" style={{
+          height: isOpen ? 'calc(100% - 10px)' : '0px',
+          overflow: 'hidden',  // Hide the content when closed
+          transition: 'height 0.2s ease-out',
+        }}>
+          {/* Sidebar for toggling "Add track" vs "Add playlist" */}
           <div className="w-20 bg-[#202324] flex flex-col items-center py-4">
-            <button 
-              className={`p-2 mb-4 rounded ${activeTab === 'song' ? 'bg-green-500 text-white' : 'text-white hover:text-green-400'}`}
-              onClick={() => setActiveTab('song')}
+            <button
+              className={`p-2 mb-4 rounded ${
+                tabs[0].type === 'add' && tabs[0].mode === 'track'
+                  ? 'bg-green-500 text-white'
+                  : 'text-white hover:text-green-400'
+              }`}
+              onClick={() => {
+                setAddTabMode('track');
+                setActiveTabIndex(0);
+              }}
             >
               <FaMusic size={20} />
             </button>
-            <button 
-              className={`p-2 rounded ${activeTab === 'playlist' ? 'bg-green-500 text-white' : 'text-white hover:text-green-400'}`}
-              onClick={() => setActiveTab('playlist')}
+            <button
+              className={`p-2 rounded ${
+                tabs[0].type === 'add' && tabs[0].mode === 'playlist'
+                  ? 'bg-green-500 text-white'
+                  : 'text-white hover:text-green-400'
+              }`}
+              onClick={() => {
+                setAddTabMode('playlist');
+                setActiveTabIndex(0);
+              }}
             >
               <FaList size={20} />
             </button>
           </div>
 
           {/* Main content area */}
-          <div className="flex-1 p-4 overflow-hidden flex flex-col">
-            {activeTab === 'song' && (
-              <div>
-                <h3 className="text-white text-lg mb-3">Add Track</h3>
-                <div className="flex mb-4">
-                  <input
-                    type="text"
-                    placeholder="Search for a track..."
-                    className="flex-1 p-2 bg-[#202324] text-white rounded-l outline-none"
-                    value={searchQuery}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
-                  />
-                  <button onClick={() => setSearchQuery('')}>
-                    X
-                  </button>
-                </div>
+          <div className="flex-1 p-2 overflow-hidden flex flex-col -mt-2">
+            {/* Row of "chrome-like" tabs */}
+            <div className="flex items-center space-x-2 mb-2 px-2">
+              {/* Fixed "Add" tab */}
+              <div
+                className={`
+                  relative flex items-center 
+                  px-3 py-1 border border-gray-600 rounded-t
+                  cursor-pointer
+                  ${activeTabIndex === 0 ? 'bg-gray-800 border-b-0' : 'bg-[#1f1f1f] hover:bg-gray-700'}
+                `}
+                onClick={() => setActiveTabIndex(0)}
+              >
+                <span className="text-white text-sm mr-2">{(tabs[0] as TabAdd).title}</span>
 
-                {/* Search Results */}
-                <div className="overflow-y-auto no-scrollbar" style={{ maxHeight: `${Math.max(height - 130, 0)}px` }}>
-                  {searchResults.length > 0 ? (
-                    <ul className="divide-y divide-gray-800">
-                      {searchResults.map((track) => (
-                        <li key={track.id} className="py-2 flex justify-between text-white">
-                          <div>
-                            <div className="font-medium">{track.name}</div>
-                            <div className="text-sm text-gray-400">
-                              {track.artists.map((a: any) => a.name).join(', ')}
+              </div>
+
+              {/* Draggable song tabs */}
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <StrictModeDroppable 
+                droppableId="tabs-droppable" direction="horizontal"
+                isDropDisabled={false}
+                isCombineEnabled={false}
+                ignoreContainerClipping={false}>
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="flex space-x-2">
+                      {tabs.slice(1).map((tab, index) => (
+                        <Draggable
+                          key={tab.type === 'song' && tab.track.id ? tab.track.id : index}
+                          draggableId={tab.type === 'song' && tab.track.id ? tab.track.id : `song-${index}`}
+                          index={index}
+                        >
+                          {(providedDraggable) => (
+                            <div
+                              ref={providedDraggable.innerRef}
+                              {...providedDraggable.draggableProps}
+                              {...providedDraggable.dragHandleProps}
+                              className={`
+                                relative flex items-center 
+                                px-3 py-1 border border-gray-600 rounded-t
+                                cursor-pointer
+                                ${activeTabIndex === index + 1 ? 'bg-gray-800 border-b-0' : 'bg-[#1f1f1f] hover:bg-gray-700'}
+                              `}
+                              onClick={() => setActiveTabIndex(index + 1)}
+                            >
+                              <span className="text-white text-sm mr-2">{(tab as TabSong).track.name}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveTab(index + 1);
+                                }}
+                                className="text-gray-400 hover:text-white"
+                              >
+                                ✕
+                              </button>
                             </div>
-                          </div>
-                        </li>
+                          )}
+                        </Draggable>
                       ))}
-                    </ul>
-                  ) : searchQuery && !searchResults ? (
-                    <p className="text-gray-400">No tracks found</p>
-                  ) : null}
-                </div>
-              </div>
-            )}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </StrictModeDroppable>
+              </DragDropContext>
+            </div>
 
-            {activeTab === 'playlist' && (
-              <div>
-                <h3 className="text-white text-lg mb-3">Add Playlist</h3>
-                {!session ? (
-                  <p className="text-gray-400">Login required to access playlists</p>
-                ) : (
-                  <p className="text-gray-400">Playlist functionality coming soon</p>
-                )}
-              </div>
-            )}
+            {/* The "active" tab content fills the rest of the area */}
+            <div className="flex-1 p-4 border border-gray-700 bg-[#0c0d0e] rounded text-white overflow-auto -mt-2 no-scrollbar">
+              {renderTabContent()}
+            </div>
           </div>
+
           <style jsx>{`
             .no-scrollbar::-webkit-scrollbar {
               display: none;
             }
             .no-scrollbar {
-              -ms-overflow-style: none;  /* IE and Edge */
-              scrollbar-width: none;  /* Firefox */
+              -ms-overflow-style: none;
+              scrollbar-width: none;
             }
           `}</style>
         </div>
-      )}
     </div>
   );
 }

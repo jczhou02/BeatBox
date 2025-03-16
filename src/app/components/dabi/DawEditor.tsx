@@ -5,6 +5,7 @@ import { TrackList } from './TrackList';
 import { UploadArea } from './UploadArea';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import BottomMusicBar from './BottomMusicBar';
+import { SpotifyPlayerProvider } from '@/context/SpotifyPlayerProvider';
 
 interface DawEditorProps {
   initialProject: Project;
@@ -26,6 +27,7 @@ export const DawEditor: React.FC<DawEditorProps> = ({
     bottomLeft: ['#3a0647', '#89216b', '#4f0e5b'],
     bottomRight: ['#1e3b70', '#2a6bb8', '#097969']
   });
+  const [softTracks, setSoftTracks] = useState<any[]>([]);
 
   const {
     isPlaying,
@@ -120,7 +122,8 @@ export const DawEditor: React.FC<DawEditorProps> = ({
 
 
   return (
-<div className="min-h-screen p-3 relative" style={backgroundStyle}>    {/* <div className="absolute inset-0 bg-black bg-opacity-50" /> */}
+  <SpotifyPlayerProvider>
+    <div className="min-h-screen p-3 relative" style={backgroundStyle}>    {/* <div className="absolute inset-0 bg-black bg-opacity-50" /> */}
      {/* Optional refresh button for gradient */}
      <button 
         onClick={generateRandomGradient}
@@ -139,7 +142,7 @@ export const DawEditor: React.FC<DawEditorProps> = ({
               className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white"
               onClick={() => setShowUpload(true)}
             >
-              Add Tracks
+              Mashup
             </button>
           <button
             className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white"
@@ -207,8 +210,9 @@ export const DawEditor: React.FC<DawEditorProps> = ({
         {/* Your existing DAW editor content */}
         
         {/* Add the BottomMusicBar component at the end */}
-        <BottomMusicBar />
+        <BottomMusicBar softTracks={softTracks} setSoftTracks={setSoftTracks}/>
         </div>
     </div>
+  </SpotifyPlayerProvider>
   );
 };

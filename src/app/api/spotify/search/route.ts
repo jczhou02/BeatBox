@@ -1,7 +1,5 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { NextResponse, NextRequest} from 'next/server';
 import redis from '@/lib/redis'; // Import your Redis client from lib/redis
-import { access } from 'fs';
 
 const SPOTIFY_CACHE_TTL = 3600 * 24 // 1 day
 const SPOTIFY_TOKEN_CACHE_TTL = 3600; // 1 hour (Spotify token lifespan)
@@ -49,7 +47,7 @@ async function getSpotifyAccessToken() {
 }
 
 
-export async function GET(req) {
+export async function GET(req: NextRequest) {
   // Extract query parameter from the request
   const { searchParams } = new URL(req.url);
   const query = searchParams.get('query');
@@ -106,4 +104,8 @@ export async function GET(req) {
     console.error('Error querying Spotify API:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
+}
+
+export async function POST(req: NextRequest) {
+  return NextResponse.json({ message: 'POST request received' });
 }

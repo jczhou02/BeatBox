@@ -26,7 +26,7 @@ export const {handlers, auth, signIn, signOut,} = NextAuth({
           return token;
         }
         const expiresAt = token.expiresAt ?? 0;
-        console.log("Time until expiration (in hours):", (token.expiresAt - Date.now()) / (1000 * 3600));
+        //console.log("Time until expiration (in hours):", (token.expiresAt - Date.now()) / (1000 * 3600));
         if (Date.now() < expiresAt) {
           console.log("JWT Callback: Token is still valid.");
           return token; // Token still valid
