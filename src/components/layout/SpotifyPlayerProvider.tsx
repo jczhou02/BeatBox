@@ -2,16 +2,10 @@
 import React, { memo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSpotifyPlayer } from '@/context/SpotifyPlayerProvider';
-
-interface Track {
-  id?: string;
-  name: string;
-  artists: Array<{ name: string }>;
-  uri?: string;
-}
+import { Track, SpotifyTrack } from '@/types';
 
 interface SongTabPlaybackProps {
-  track: Track;
+  track: SpotifyTrack;
 }
 
 const SongTabPlaybackComponent = ({ track }: SongTabPlaybackProps) => {
@@ -32,8 +26,8 @@ const SongTabPlaybackComponent = ({ track }: SongTabPlaybackProps) => {
     return (
       <iframe
         src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator`}
-        width="100%"
-        height="80"
+        width="95%"
+        height="120"
         allow="encrypted-media"
       ></iframe>
     );

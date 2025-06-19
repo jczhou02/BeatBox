@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Project, Track } from '@/types';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Project, Track, UploadedTrack, MashupData } from '@/types';
 import { TransportControls } from './TransportControls';
 import { TrackList } from './TrackList';
 import { UploadArea } from './UploadArea';
-import { useAudioEngine } from '@/hooks/useAudioEngine';
+import { useToneAudioEngine } from '@/hooks/useAudioEngine';
 import BottomMusicBar from './BottomMusicBar';
+import MashupVisualizer from './MashupVisualizer';
 import { SpotifyPlayerProvider } from '@/context/SpotifyPlayerProvider';
+import { FaFileAudio } from 'react-icons/fa';
 
 interface DawEditorProps {
   initialProject: Project;
@@ -14,6 +16,7 @@ interface DawEditorProps {
   isNew?: boolean; 
   // Maybe you want to treat new projects differently
 }
+
 
 export const DawEditor: React.FC<DawEditorProps> = ({
   initialProject,
@@ -27,16 +30,21 @@ export const DawEditor: React.FC<DawEditorProps> = ({
     bottomLeft: ['#3a0647', '#89216b', '#4f0e5b'],
     bottomRight: ['#1e3b70', '#2a6bb8', '#097969']
   });
-  const [softTracks, setSoftTracks] = useState<any[]>([]);
+  const [mashupData, setMashupData] = useState<MashupData | null>(null);
+  const [softTracks, setSoftTracks] = useState<Track[]>([]);
+  const [showMashupVisualizer, setShowMashupVisualizer] = useState(false);
 
   const {
+    isLoaded,
     isPlaying,
     currentTime,
+    totalDuration,
     togglePlayback,
     seekTo,
+    updateTrackProperty,
     toggleMute,
-    toggleSolo
-  } = useAudioEngine(project.tracks || [], project.bpm);
+    toggleSolo,
+  } = useToneAudioEngine(mashupData);
 
   // For BPM changes (local or server)
   const handleBpmChange = (newBpm: number) => {
@@ -48,17 +56,14 @@ export const DawEditor: React.FC<DawEditorProps> = ({
     // If you'd like to upload them to the server, do so here.
     // Otherwise, you can store them in memory or generate local URLs, etc.
     // For now, let's just create mock tracks to demonstrate
-    const newTracks: Track[] = files.map((file, idx) => ({
+    const newTracks: UploadedTrack[] = files.map((file, idx) => ({
       id: `${Date.now()}-${idx}`,
       name: file.name,
-      artist: '',
       source: 'upload',
       fileUrl: URL.createObjectURL(file), // local object URL
-      waveformData: [], // you could generate or leave empty
-      bpm: project.bpm,
-      duration: 120,
       isMuted: false,
-      isSoloed: false
+      isSoloed: false,
+      anchor: false,
     }));
 
     setProject((prev) => ({
@@ -69,10 +74,24 @@ export const DawEditor: React.FC<DawEditorProps> = ({
     setShowUpload(false);
   };
 
-  const handleSpotifyImport = async () => {
-    // Same logic as your existing code
-  };
+  const handleMashup = useCallback(() => {
+    // Make sure there are tracks to mashup
+    if (softTracks.length > 0) {
+        setShowMashupVisualizer(true);
+    } else {
+        alert("Please add some tracks from the music bar below first!");
+    }
+  }, [softTracks]);
 
+  const handleMashupComplete = useCallback((newMashupData: MashupData) => {
+    console.log("DawEditor received new mashup data, updating state:", newMashupData);
+    setMashupData(newMashupData); // Update the correct state variable
+    setShowMashupVisualizer(false); // Close the modal
+  }, []);
+
+  useEffect(() => {
+    console.log('softTracks', softTracks);
+  }, [softTracks]);
 
   useEffect(() => {
     generateRandomGradient();
@@ -111,14 +130,14 @@ export const DawEditor: React.FC<DawEditorProps> = ({
   };
 
   // Create the gradient CSS string
-  const backgroundStyle = {
+  const backgroundStyle = useMemo(() => ({
     background: `
       radial-gradient(circle at top right, ${gradientColors.topRight[0]}, ${gradientColors.topRight[1]}, ${gradientColors.topRight[2]}),
       radial-gradient(circle at bottom left, ${gradientColors.bottomLeft[0]}50, ${gradientColors.bottomLeft[1]}40, ${gradientColors.bottomLeft[2]}30),
       radial-gradient(circle at bottom right, ${gradientColors.bottomRight[0]}, ${gradientColors.bottomRight[1]}, ${gradientColors.bottomRight[2]})
     `,
     backgroundBlendMode: 'overlay'
-  };
+  }), [gradientColors]);
 
 
   return (
@@ -127,7 +146,7 @@ export const DawEditor: React.FC<DawEditorProps> = ({
      {/* Optional refresh button for gradient */}
      <button 
         onClick={generateRandomGradient}
-        className="absolute bottom-3 right-5 bg-black bg-opacity-30 hover:bg-opacity-50 text-white p-2 rounded-full z-10"
+        className="absolute bottom-1 right-1.5 bg-black bg-opacity-30 hover:bg-opacity-50 text-white p-2 rounded-full z-10"
         title="Refresh background"
       >
         🔄
@@ -140,15 +159,15 @@ export const DawEditor: React.FC<DawEditorProps> = ({
         <div className='flex space-x-2'>
         <button
               className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white"
-              onClick={() => setShowUpload(true)}
+              onClick={handleMashup}
             >
               Mashup
             </button>
           <button
-            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white"
-            onClick={() => onSave(project)}
+            className="bg-[#0c0d0e] hover:bg-green-700 px-1.5 py-1.5 rounded text-white"
+            onClick={() => setShowUpload(true)}
           >
-            Save
+            <FaFileAudio />
           </button>
         </div>
       </header>
@@ -159,34 +178,44 @@ export const DawEditor: React.FC<DawEditorProps> = ({
         bpm={project.bpm}
         onPlayPause={togglePlayback}
         onBpmChange={handleBpmChange}
+        currentTime={currentTime}
+        totalDuration={totalDuration}
+        onSeek={seekTo}
+        isLoaded={isLoaded}
       />
 
       {/* Tracks */}
       <div className="my-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-white">Tracks</h2>
-          <div className="flex space-x-2">
-            
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-white">Mashup Timeline</h2>
           </div>
-        </div>
 
-        {project.tracks.length > 0 ? (
-          <TrackList
-            tracks={project.tracks}
-            currentTime={currentTime}
-            onSeek={seekTo}
-            onMute={toggleMute}
-            onSolo={toggleSolo}
-            onVolumeChange={(trackId, volume) => {
-              // handle volume changes
-            }}
-          />
-        ) : (
-          <p className="text-gray-400 text-center py-8">
-            No tracks yet. Add some tracks to get started.
-          </p>
-        )}
-      </div>
+          {!mashupData && (
+            <div className="text-gray-500 text-center py-16 border-2 border-dashed border-gray-700 rounded-lg">
+              <p>Your generated mashup will appear here.</p>
+              <p className="text-sm">Use the &apos;Create Mashup&apos; button to begin.</p>
+            </div>
+          )}
+
+          {mashupData && !isLoaded && (
+             <div className="text-blue-400 text-center py-16">Loading audio assets...</div>
+          )}
+
+          {isLoaded && mashupData ? (
+            <TrackList
+              mashupData={mashupData}
+              currentTime={currentTime}
+              totalDuration={totalDuration}
+              onMute={toggleMute}
+              onSolo={toggleSolo}
+              onUpdateTrackProperty={updateTrackProperty}
+            />
+          ) : (
+            <p className="text-gray-400 text-center py-8">
+              Create a mashup to see the timeline here.
+            </p>
+          )}
+        </div>
 
       {/* Upload Modal */}
       {showUpload && (
@@ -207,11 +236,20 @@ export const DawEditor: React.FC<DawEditorProps> = ({
       )}
 
         <div className="relative h-full">
-        {/* Your existing DAW editor content */}
         
-        {/* Add the BottomMusicBar component at the end */}
-        <BottomMusicBar softTracks={softTracks} setSoftTracks={setSoftTracks}/>
+          <BottomMusicBar softTracks={softTracks} setSoftTracks={setSoftTracks}/>
         </div>
+        {showMashupVisualizer && (
+          <MashupVisualizer
+            tracks={softTracks}
+            onUpdateTracks={(updatedTracks) =>
+              // setProject((prev) => ({ ...prev, tracks: updatedTracks }))
+              console.log('updatedTracks', updatedTracks)
+            }
+            onClose={() => setShowMashupVisualizer(false)}
+            updateDAWState={handleMashupComplete}
+          />
+        )}
     </div>
   </SpotifyPlayerProvider>
   );

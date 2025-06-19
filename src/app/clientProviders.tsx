@@ -16,7 +16,7 @@ export default function ClientProviders({ children }: { children: ReactNode }) {
           <Sidebar />
 
           {/* Main content: grows to fill the rest of the space */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto no-scrollbar">
             {children}
           </main>
         </div>

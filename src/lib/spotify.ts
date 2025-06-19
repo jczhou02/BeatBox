@@ -1,38 +1,40 @@
-/**
- * Utilities for Spotify API integration
- */
+import { SpotifyPlaylist, SpotifyTrack } from '../types';
+import SpotifyWebApi from "spotify-web-api-node";
 
-export interface SpotifyTrack {
-    id: string;
-    name: string;
-    artists: string[];
-    album: {
-      name: string;
-      images: { url: string; width: number; height: number }[];
-    };
-    duration_ms: number;
-    preview_url: string | null;
-  }
-  
-  export interface SpotifyPlaylist {
-    id: string;
-    name: string;
-    tracks: {
-      items: {
-        track: SpotifyTrack;
-      }[];
-    };
-  }
-  
-  /**
-   * Fetch a user's playlists from Spotify
-   */
+// Initialize the Spotify Web API
+const spotifyApi = new SpotifyWebApi({
+  clientId: process.env.SPOTIFY_CLIENT_ID,
+  clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+  redirectUri: process.env.NEXT_PUBLIC_REDIRECT_URI || "http://localhost:3000/api/auth/callback/spotify", // Use environment variable for production
+});
+
+const scopes = [
+  "streaming",
+  "user-read-email",
+  "user-read-private",
+  "user-top-read",
+  "playlist-read-private", 
+  "playlist-read-collaborative",
+].join(",");
+
+const params = {
+  scope: scopes,
+};
+
+const queryParamString = new URLSearchParams(params);
+const LOGIN_URL = `https://accounts.spotify.com/authorize?${queryParamString.toString()}`;
+
+export { spotifyApi, LOGIN_URL };
+
+
+
+
   export async function getUserPlaylists(accessToken: string): Promise<any[]> {
-    const response = await fetch('https://api.spotify.com/v1/me/playlists', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
+    const response = await fetch('https://api.spotify.com/v1/me/playlists?fields=items(id,images,tracks(total))', { 
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
     
     if (!response.ok) {
       throw new Error(`Failed to fetch playlists: ${response.statusText}`);
@@ -42,9 +44,6 @@ export interface SpotifyTrack {
     return data.items;
   }
   
-  /**
-   * Fetch a specific playlist with its tracks
-   */
   export async function getPlaylistWithTracks(accessToken: string, playlistId: string): Promise<SpotifyPlaylist> {
     const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}?fields=id,name,tracks.items(track(id,name,artists(name),album(name,images),duration_ms,preview_url))`, {
       headers: {

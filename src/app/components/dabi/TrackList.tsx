@@ -1,47 +1,39 @@
+// src/app/components/dabi/TrackList.tsx
 import React from 'react';
-import { Track } from '@/types';
-import { WaveformDisplay } from './WaveFormDisplay';
-import { TrackControls } from './TrackControls';
+import { TrackLane } from './TrackLane';
+import { MashupData } from '@/types'; // Import main type
 
 interface TrackListProps {
-  tracks: Track[];
+  mashupData: MashupData;
   currentTime: number;
-  onSeek: (time: number) => void;
-  onMute: (id: string) => void;
-  onSolo: (id: string) => void;
-  onVolumeChange: (id: string, volume: number) => void;
+  totalDuration: number;
+  onMute: (stemPath: string, isMuted: boolean) => void;
+  onSolo: (stemPath: string, isSoloed: boolean) => void;
+  onUpdateTrackProperty: (stemPath: string, property: 'volume' | 'pan', value: number) => void;
+  // onSeek is not needed here, handled by transport
 }
 
 export const TrackList: React.FC<TrackListProps> = ({
-  tracks,
+  mashupData,
   currentTime,
-  onSeek,
+  totalDuration,
   onMute,
   onSolo,
-  onVolumeChange
+  onUpdateTrackProperty,
 }) => {
   return (
     <div className="space-y-4">
-      {tracks.map(track => (
-        <div key={track.id} className="flex items-center space-x-4 bg-gray-800 p-2 rounded">
-          <div className="flex-1">
-            <div className="text-sm font-medium text-white">{track.name}</div>
-            <div className="text-xs text-gray-400">{track.artist || 'Unknown'}</div>
-            <WaveformDisplay
-              track={track}
-              currentTime={currentTime}
-              color={track.color || '#ff4081'}
-              height={80}
-              onClick={onSeek}
-            />
-          </div>
-          <TrackControls
-            track={track}
-            onMute={onMute}
-            onSolo={onSolo}
-            onVolumeChange={onVolumeChange}
-          />
-        </div>
+      {/* Map over tracks and render a lane for each */}
+      {mashupData.timeline.tracks.map((track) => (
+        <TrackLane
+          key={track.stem_path}
+          trackData={track}
+          totalDuration={totalDuration}
+          onMute={onMute}
+          onSolo={onSolo}
+          onUpdateTrackProperty={onUpdateTrackProperty}
+          currentTime={currentTime}
+        />
       ))}
     </div>
   );

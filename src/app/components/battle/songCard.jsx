@@ -22,6 +22,7 @@ export default function SongCard({ song, onSelect }) {
         src={song.album?.images?.[0]?.url || '/default-album.png'}
         alt={song.name}
         width={32}
+        height={32}
         className="w-10 h-10 rounded mr-4"
       />
       <p className="text-white text-sm flex-grow">{trimFeatArtists(song.name)}</p>
