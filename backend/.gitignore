@@ -12,6 +12,7 @@ __pycache__/
 test/
 tests/
 *.pytest_cache/
+pytest.ini
 .coverage
 htmlcov/
 
