@@ -93,6 +93,7 @@ async def generate_mashup(payload: MashupPayload, supabase: AsyncClient) -> Mash
     processed_payload_tracks = list(initial_tracks) # Start with a copy
 
     # --- Augmentation Logic ---
+    '''
     if mode == "mashup-plus":
         if len(initial_tracks) == 1 and not initial_tracks[0].anchor:
             # Scenario 1: Single non-anchor track provided, need to find *one* anchor
@@ -173,10 +174,10 @@ async def generate_mashup(payload: MashupPayload, supabase: AsyncClient) -> Mash
             else:
                 logger.warning("Augment suggestions requested, but no anchor track found in initial payload.")
     # --- END Augmentation Logic ---
-
+'''
 
     # === Proceed with the rest of the mashup logic using processed_payload_tracks ===
-    logger.info(f"Total tracks after potential augmentation: {len(processed_payload_tracks)}")
+    logger.info(f"Total tracks: {len(processed_payload_tracks)}")
 
     # 1. Identify Tracks & Process Stems (using potentially augmented list)
     source_tracks, anchor_src_ids = await _identify_source_tracks(processed_payload_tracks)

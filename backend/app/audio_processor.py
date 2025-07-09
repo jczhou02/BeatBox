@@ -4,6 +4,10 @@ import tempfile
 import asyncio
 import subprocess
 import uuid
+import httpx
+import zipfile
+import io
+import modal
 from .utils import upload_file_sync 
 from yt_dlp import YoutubeDL
 from typing import Dict, Optional
@@ -70,6 +74,7 @@ async def record_new_stems(source_track_id: str, stem_paths: Dict[str, str], mod
             logger.error(f"Supabase error recording stems for {source_track_id}: {e}", exc_info=True)
             # Decide how to handle: raise error? proceed without recording?
 
+'''
 def run_demucs_sync(downloaded_file_path: str, output_base_dir: str, model: str) -> Dict[str, str]:
     """
     Synchronous function to run Demucs. Designed to be run in a thread.
@@ -138,6 +143,8 @@ def run_demucs_sync(downloaded_file_path: str, output_base_dir: str, model: str)
     except Exception as e:
          logger.error(f"Unexpected error running Demucs for {downloaded_file_path}: {e}", exc_info=True)
          return {}
+'''
+
 
 async def download_and_separate_audio(source_track_id: str, youtube_id: str, model: str, supabase: AsyncClient) -> Dict[str, str]:
     """
@@ -147,7 +154,7 @@ async def download_and_separate_audio(source_track_id: str, youtube_id: str, mod
     if not youtube_id:
         logger.warning(f"No YouTube ID provided for source track {source_track_id}. Cannot download.")
         return {}
-
+    
     youtube_url = f"https://www.youtube.com/watch?v={youtube_id}"
     downloaded_file_path = None
     temp_dir_obj = tempfile.TemporaryDirectory()
@@ -195,53 +202,40 @@ async def download_and_separate_audio(source_track_id: str, youtube_id: str, mod
         if not downloaded_file_path:
             raise FileNotFoundError(f"Failed to download or locate audio for {youtube_url}")
 
-        # 2. Run Demucs (in a thread)
-        logger.info(f"Running Demucs for: {downloaded_file_path}")
-        demucs_output_base_dir = os.path.join(temp_dir_path, "demucs_output")
-        os.makedirs(demucs_output_base_dir, exist_ok=True)
-        local_stem_paths = await asyncio.to_thread(run_demucs_sync, downloaded_file_path, demucs_output_base_dir, model)
+        # 2. Run Demucs (in a thread) OLD STEP
+        # logger.info(f"Running Demucs for: {downloaded_file_path}")
+        # demucs_output_base_dir = os.path.join(temp_dir_path, "demucs_output")
+        # os.makedirs(demucs_output_base_dir, exist_ok=True)
+        # local_stem_paths = await asyncio.to_thread(run_demucs_sync, downloaded_file_path, demucs_output_base_dir, model)
 
-        if not local_stem_paths:
-            raise RuntimeError(f"Demucs failed to produce stems for {source_track_id}")
+        # if not local_stem_paths:
+        #     raise RuntimeError(f"Demucs failed to produce stems for {source_track_id}")
 
-        logger.info(f"Demucs finished. Found stems: {list(local_stem_paths.keys())}")
+        # logger.info(f"Demucs finished. Found stems: {list(local_stem_paths.keys())}")
 
-        # 3. Upload Stems to Supabase Storage (concurrently)
-        upload_tasks = []
-        uploaded_storage_paths = {}
-        stem_upload_details = []  # Initialize the list to store details for each stem
-        for stem_type, local_path in local_stem_paths.items():
-            storage_path = get_stem_storage_path(source_track_id, stem_type)
-            # Populate stem_upload_details with the necessary information
-            async def upload_task(l_path, s_path):
-                with open(l_path, 'rb') as f:
-                    # Use the async upload method
-                    await supabase.storage.from_(BUCKET_NAME).upload(s_path, f)
-            
-            upload_tasks.append(upload_task(local_path, storage_path))
 
-        # Store the paths to map results back
-        uploaded_storage_paths = {st: get_stem_storage_path(source_track_id, st) for st in local_stem_paths.keys()}
+        # NEW STEP: Use Demucs GPU Service
+        logger.info(f"Sending {os.path.basename(downloaded_file_path)} to demucs_modal_separator_service")
+        # Read the downloaded audio file into memory
+        with open(downloaded_file_path, "rb") as f:
+            audio_data = f.read()
 
-        upload_results = await asyncio.gather(*upload_tasks, return_exceptions=True)
-        successfully_uploaded_stems = {}
-        for stem_type, storage_path in uploaded_storage_paths.items():
-             # To confirm success, you could try to get the public URL or list the files.
-             # For simplicity, we'll assume no exception means success.
-             # Let's find the corresponding result
-             index = list(uploaded_storage_paths.keys()).index(stem_type)
-             if not isinstance(upload_results[index], Exception):
-                 logger.info(f"Successfully uploaded stem '{stem_type}' to {storage_path} for {source_track_id}.")
-                 successfully_uploaded_stems[stem_type] = storage_path
-             else:
-                 logger.error(f"Exception during upload of stem '{stem_type}' to {storage_path} for {source_track_id}: {upload_results[index]}", exc_info=upload_results[index])
+            # Get a handle to our deployed Modal function
+        separate_audio_func = modal.Function.from_name("demucs-separator-service", "separate_audio")
+        
+        successfully_uploaded_stems = separate_audio_func.remote(
+        audio_bytes=audio_data, 
+        original_filename=os.path.basename(downloaded_file_path),
+        source_track_id=source_track_id, # <-- Pass the ID for storage path
+        )
+        
+        if not successfully_uploaded_stems:
+            raise RuntimeError("Modal service did not return any uploaded stem paths.")
 
-        logger.info(f"Finished uploading. {len(successfully_uploaded_stems)}/{len(local_stem_paths)} stems successfully uploaded for {source_track_id}.")
+        logger.info(f"Modal service reported successful uploads: {successfully_uploaded_stems}")
 
-        if successfully_uploaded_stems:
-            await record_new_stems(source_track_id, successfully_uploaded_stems, model, supabase=supabase)
-        else:
-            logger.warning(f"No stems were successfully uploaded for {source_track_id}. Nothing to record in database.")
+        # Record the new stems in our database (this is still the orchestrator's job)
+        await record_new_stems(source_track_id, successfully_uploaded_stems, model, supabase=supabase)
 
         return successfully_uploaded_stems
 
@@ -251,6 +245,53 @@ async def download_and_separate_audio(source_track_id: str, youtube_id: str, mod
     finally:
         temp_dir_obj.cleanup()
         logger.debug(f"Cleaned up temporary directory: {temp_dir_path}")
+
+
+        # 3. Upload Stems to Supabase Storage (concurrently)  --------OLD STEP----------
+        # upload_tasks = []
+        # uploaded_storage_paths = {}
+        # stem_upload_details = []  # Initialize the list to store details for each stem
+        # for stem_type, local_path in local_stem_paths.items():
+        #     storage_path = get_stem_storage_path(source_track_id, stem_type)
+        #     # Populate stem_upload_details with the necessary information
+        #     async def upload_task(l_path, s_path):
+        #         with open(l_path, 'rb') as f:
+        #             # Use the async upload method
+        #             await supabase.storage.from_(BUCKET_NAME).upload(s_path, f)
+            
+        #     upload_tasks.append(upload_task(local_path, storage_path))
+
+        # # Store the paths to map results back
+        # uploaded_storage_paths = {st: get_stem_storage_path(source_track_id, st) for st in local_stem_paths.keys()}
+
+        # upload_results = await asyncio.gather(*upload_tasks, return_exceptions=True)
+        # successfully_uploaded_stems = {}
+        # for stem_type, storage_path in uploaded_storage_paths.items():
+        #      # To confirm success, you could try to get the public URL or list the files.
+        #      # For simplicity, we'll assume no exception means success.
+        #      # Let's find the corresponding result
+        #      index = list(uploaded_storage_paths.keys()).index(stem_type)
+        #      if not isinstance(upload_results[index], Exception):
+        #          logger.info(f"Successfully uploaded stem '{stem_type}' to {storage_path} for {source_track_id}.")
+        #          successfully_uploaded_stems[stem_type] = storage_path
+        #      else:
+        #          logger.error(f"Exception during upload of stem '{stem_type}' to {storage_path} for {source_track_id}: {upload_results[index]}", exc_info=upload_results[index])
+
+        # logger.info(f"Finished uploading. {len(successfully_uploaded_stems)}/{len(local_stem_paths)} stems successfully uploaded for {source_track_id}.")
+
+        # if successfully_uploaded_stems:
+        #     await record_new_stems(source_track_id, successfully_uploaded_stems, model, supabase=supabase)
+        # else:
+        #     logger.warning(f"No stems were successfully uploaded for {source_track_id}. Nothing to record in database.")
+
+        # return successfully_uploaded_stems
+
+    # except Exception as e:
+    #     logger.error(f"Error processing audio for source {source_track_id} (YT: {youtube_id}): {e}", exc_info=True)
+    #     return {}
+    # finally:
+    #     temp_dir_obj.cleanup()
+    #     logger.debug(f"Cleaned up temporary directory: {temp_dir_path}")
 
 
 async def _get_or_create_stems_for_track(src_id: str, yt_id: Optional[str], model: str, supabase_client: AsyncClient) -> tuple[str, Dict[str, str]]:

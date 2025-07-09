@@ -35,7 +35,8 @@ const IncomingTrackSchema = z.object({
 const RequestBodySchema = z.object({
   tracks: z.array(IncomingTrackSchema).min(1),
   mode: z.enum(["mashup", "mashup-plus"]),
-  numSuggestions: z.number().int().min(0).optional(),
+  temperature: z.number().min(0).max(1).optional().default(0.1), // Optional
+  numSuggestions: z.number().int().min(0).optional(),  // Optional
 });
 
 
@@ -58,7 +59,7 @@ function normalizeString(str: string): string {
     title: string;
     section?: string;
     "Chord Progression"?: string;
-    cp?: string; // Alias for Chord Progression
+    cp?: string | Record<string, any>; // Chord progression, can be string or object
     Key?: string;
     Scale?: string;
     BPM?: number; // Should be number in DB
@@ -74,7 +75,7 @@ function normalizeString(str: string): string {
     "Duration (ms)"?: number; // Section duration
     Genres?: string[]; // Assuming array
     "Time Signature"?: string;
-    Melody?: string;
+    Melody?: string  | Record<string, any>[];
     "YouTube ID"?: string;
     "Start Timestamp (s)"?: number;
     "End Timestamp (s)"?: number;
@@ -97,7 +98,7 @@ function normalizeString(str: string): string {
         console.error("Invalid input:", validationResult.error.flatten());
         return NextResponse.json({ error: "Invalid input data", details: validationResult.error.flatten() }, { status: 400 });
       }
-      const { tracks: incomingTracks, mode, numSuggestions } = validationResult.data;
+      const { tracks: incomingTracks, mode, temperature, numSuggestions } = validationResult.data;
   
       console.log("Received tracks:", incomingTracks);
   
@@ -220,7 +221,7 @@ function normalizeString(str: string): string {
         tracks: payloadForPython, // payloadForPython is already the array of tracks
         mode: mode, // Pass the mode from the original request
         numSuggestions: numSuggestions, // Pass this along too
-        temperature: 0.3 // Or get this from request if you want
+        temperature: temperature // Or get this from request if you want
     };
 
     console.log("Sending complete payload to Python:", JSON.stringify(completePayload, null, 2));

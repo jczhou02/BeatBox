@@ -111,7 +111,10 @@ def get_camelot_number(key: Optional[str], scale: Optional[str]) -> Optional[Tup
          normalized_key_root = normalized_key_root[0].upper() + normalized_key_root[1:]
 
     # Construct the lookup key string
-    lookup_key_str = f"{normalized_key_root} {scale.lower().strip()}"
+    scale_cleaned = scale.lower().strip()
+    if scale_cleaned is "harmonicminor":           #  IMPORTANT: assumed harmonic minor == minor 
+        scale_cleaned = "minor"
+    lookup_key_str = f"{normalized_key_root} {scale_cleaned}"
 
     camelot_value = CAMELOT_MAP.get(lookup_key_str)
     if not camelot_value:

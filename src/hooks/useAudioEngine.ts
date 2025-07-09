@@ -20,6 +20,42 @@ export const useToneAudioEngine = (mashupData: MashupData | null) => {
   const partsRef = useRef<Tone.Part[]>([]);
   const animationFrameRef = useRef<number>(0);
 
+ 
+  // **** CHANGE 1: A new helper function to handle starting playback from any point ****
+  const startPlaybackFrom = useCallback((startTime: number) => {
+    if (!mashupData) return;
+
+    // This logic finds which clips should be playing at the `startTime`
+    // and schedules them to start immediately with the correct offset.
+    mashupData.timeline.tracks.forEach(trackData => {
+      const player = playersRef.current.get(trackData.stem_path);
+      if (!player) return;
+
+      trackData.clips.forEach(clip => {
+        const clipStart = clip.project_start_time;
+        const clipEffectiveDuration = clip.source_duration / clip.playback_rate;
+        const clipEnd = clipStart + clipEffectiveDuration;
+
+        // Check if the transport should be playing this clip right now
+        if (startTime >= clipStart && startTime < clipEnd) {
+          const timeIntoClip = startTime - clipStart;
+          const sourceOffset = clip.source_start_time + (timeIntoClip * clip.playback_rate);
+          const remainingDuration = clipEnd - startTime;
+          
+          player.playbackRate = clip.playback_rate;
+          player.start(Tone.now(), sourceOffset, remainingDuration);
+          console.log(`Manually starting ${getStemName(trackData.stem_path)} from offset ${sourceOffset}`);
+        }
+      });
+    });
+
+    // Start the transport. Tone.Part will handle all future events.
+    // The second argument `startTime` tells the Transport where to begin its timeline.
+    Tone.getTransport().start(Tone.now(), startTime);
+    setIsPlaying(true);
+  }, [mashupData]);
+
+
   useEffect(() => {
     const cleanup = () => {
       console.log('Cleaning up previous audio engine state...');
@@ -62,22 +98,26 @@ export const useToneAudioEngine = (mashupData: MashupData | null) => {
 
       // --- Create and Load GrainPlayers ---
       // We load each player individually to connect it to its channel.
-      const loadPromises = mashupData.timeline.tracks.map(trackData => {
-          const stemName = getStemName(trackData.stem_path);
-          const url = mashupData.stem_urls[trackData.stem_path];
-          
-          if (!url) {
-              console.error(`No signed URL found for stem_path: ${trackData.stem_path}`);
-              return Promise.resolve();
-          }
-          
-          const player = new Tone.GrainPlayer({ url })
-              .connect(channelsRef.current.get(stemName)!); 
-          
-          playersRef.current.set(trackData.stem_path, player);
-          return player.loaded;
+      const loadPromises = mashupData.timeline.tracks.map(async trackData => {
+        const stemName = getStemName(trackData.stem_path);
+        const url = mashupData.stem_urls[trackData.stem_path];
+        
+        if (!url) {
+            console.error(`No signed URL found for stem_path: ${trackData.stem_path}`);
+            return;
+        }
+        
+        const player = new Tone.GrainPlayer({
+          url,
+          onload: () => console.log(`${stemName} loaded with duration: ${player.buffer.duration}`)
+        }).connect(channelsRef.current.get(stemName)!);
+        
+        playersRef.current.set(trackData.stem_path, player);
+        await player.loaded; // This promise resolves when the buffer is fully decoded.
       });
 
+      await Promise.all(loadPromises);
+      console.log("All audio stems have been loaded.");
       // --- Create and Schedule Parts ---
       let maxDuration = 0;
       mashupData.timeline.tracks.forEach((trackData: MashupTrackData) => {
@@ -154,48 +194,36 @@ export const useToneAudioEngine = (mashupData: MashupData | null) => {
       await Tone.start();
     }
     
-    if (Tone.getTransport().state === 'started') {
-      playersRef.current.forEach(player => {
-        player.stop();
-      });
+    if (isPlaying) {
+      // Stop all players immediately for a clean pause
+      playersRef.current.forEach(player => player.stop());
       Tone.getTransport().pause();
       setIsPlaying(false);
     } else {
-      const resumeTime = Tone.getTransport().seconds;
-
-      if (resumeTime > 0) {
-      mashupData?.timeline.tracks.forEach(trackData => {
-        const player = playersRef.current.get(trackData.stem_path);
-        if (!player) return;
-        trackData.clips.forEach(clip => {
-          const clipStart = clip.project_start_time;
-          const clipDur   = clip.source_duration / clip.playback_rate;
-          const clipEnd   = clipStart + clipDur;
-          if (resumeTime >= clipStart && resumeTime < clipEnd) {
-            const timeIntoClip   = resumeTime - clipStart;
-            const sourceOffset   = clip.source_start_time + timeIntoClip * clip.playback_rate;
-            const remainingDur   = clipEnd - resumeTime;
-            player.playbackRate = clip.playback_rate;
-            // schedule *only* this one manual restart
-            player.start(Tone.now(), sourceOffset, remainingDur);
-            console.log(`Resuming ${trackData.stem_path} at ${resumeTime} seconds`);
-          }
-        });
-      });
+      // Use our helper to resume from the current position
+      startPlaybackFrom(Tone.getTransport().seconds);
     }
+  }, [isLoaded, isPlaying, startPlaybackFrom]);
 
-    // now fire off the transport once
-    Tone.getTransport().start();
-    setIsPlaying(true);
-  }
-}, [isLoaded, mashupData]);
 
-  // seekTo is fine, but we'll ensure the state is updated correctly
+  
   const seekTo = useCallback((time: number) => {
     if (!isLoaded || time < 0 || time > totalDuration) return;
+
+    // Stop all players to prevent audio from the old position from lingering.
+    // This is the most critical step.
+    playersRef.current.forEach(player => player.stop());
+    
+    // Set the new time on the transport
     Tone.getTransport().seconds = time;
-    setCurrentTime(time); // Immediately update UI
-  }, [isLoaded, totalDuration]);
+    setCurrentTime(time); // Immediately update UI for responsiveness
+
+    // If we were playing before the seek, we need to restart playback from the new position.
+    if (isPlaying) {
+      // Use our helper to correctly start players at the new time.
+      startPlaybackFrom(time);
+    }
+  }, [isLoaded, isPlaying, totalDuration, startPlaybackFrom]);
 
   // updateTrackProperty is fine (no changes needed)
   const updateTrackProperty = useCallback((stemPath: string, property: 'volume' | 'pan', value: number) => {

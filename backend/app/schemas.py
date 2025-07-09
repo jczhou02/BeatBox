@@ -1,10 +1,10 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union, Any
 from pydantic import BaseModel, Field
 
 
 class InputSection(BaseModel):
     hooktheory_section_id: str
-    source_track_id: str
+    source_track_id: str | None
     artist: str
     title: str
     section_name: Optional[str] = None
@@ -14,8 +14,8 @@ class InputSection(BaseModel):
     meter: Optional[int] = None   # number of beats in a measure
     beatUnit: Optional[int] = None    # how much a beat is worth
     chord_progression: Optional[str] = None
-    cp: Optional[str] = None
-    melody: Optional[str] = None
+    cp: Optional[Union[str, List[Dict[str, Any]]]] = None
+    melody: Optional[Union[str, List[Dict[str, Any]]]] = None
     youtube_id: Optional[str] = None # Used for download if needed
     start_time_s: float = 0.0
     end_time_s: Optional[float] = None

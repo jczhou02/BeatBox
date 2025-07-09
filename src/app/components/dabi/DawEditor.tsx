@@ -146,7 +146,7 @@ export const DawEditor: React.FC<DawEditorProps> = ({
      {/* Optional refresh button for gradient */}
      <button 
         onClick={generateRandomGradient}
-        className="absolute bottom-1 right-1.5 bg-black bg-opacity-30 hover:bg-opacity-50 text-white p-2 rounded-full z-10"
+        className="absolute bottom-1 right-1.5 bg-black bg-opacity-30 hover:bg-opacity-50 text-white p-2 rounded-full z-30"
         title="Refresh background"
       >
         🔄

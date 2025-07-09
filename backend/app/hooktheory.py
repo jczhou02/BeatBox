@@ -18,7 +18,7 @@ SUGGESTION_LONG_NOTE_CUT_THRESHOLD_BEATS = 1.5
 
 # If the gap after a suggestion vocal is longer than this (in seconds),
 # try to fill it with the anchor's own vocal.
-VOCAL_GAP_FALLBACK_THRESHOLD = 2.0
+VOCAL_GAP_FALLBACK_THRESHOLD = 1.0
 
 FLOAT_TOLERANCE = 0.001
 
@@ -309,7 +309,46 @@ def find_anchor_transition_start_info(
 
     return anchor_transition_start_beat, anchor_source_start_time, anchor_project_start_time
 
+def find_initial_phrase_duration_beats(
+    notes: List[Note],
+    long_note_threshold: float = SUGGESTION_LONG_NOTE_CUT_THRESHOLD_BEATS
+) -> float:
+    """
+    Calculates the duration of the first continuous vocal phrase in a list of notes.
+    The phrase ends at the first rest or after the first long note.
+    """
+    if not notes or notes[0].is_rest or notes[0].beat is None or notes[0].beat > 1:
+        logger.debug("No initial phrase found: No notes or first note is a rest or starts after beat 0.")
+        # No phrase if the section starts with a rest or the first note isn't at beat 0.
+        return 0.0
 
+    phrase_end_beat = 0.0
+    last_note_end = notes[0].end_beat if notes[0].end_beat is not None else 0.0
+
+    for note in notes:
+        if note.is_rest or note.beat is None or note.end_beat is None:
+            logger.debug("found rest noted, ending phrase search.")
+            # This is a rest immediately following the phrase, so the phrase ends where the last note ended.
+            phrase_end_beat = last_note_end
+            break
+        # Check for gap between notes
+        if note.beat > last_note_end:
+            logger.debug(f"FOUND GAP | prev note ends at: {last_note_end}, next note starts at: {note.beat:.2f}, ending phrase search.")
+            phrase_end_beat = last_note_end
+            break # End of the initial phrase
+
+        last_note_end = note.end_beat
+
+        # If it's a long note, the phrase can end here.
+        if note.duration and note.duration >= long_note_threshold:
+            phrase_end_beat = note.end_beat
+            break
+
+    # If loop finished without finding a specific end point, use the end of the last note in the phrase.
+    if phrase_end_beat == 0.0:
+        phrase_end_beat = last_note_end
+
+    return phrase_end_beat
 
 # --- Timeline Creation ---
 
@@ -562,6 +601,7 @@ async def create_timeline_from_pairings(
                             # --- REFACTORED GAP-FILLING LOGIC ---
                             # Check if there's a significant gap AFTER the suggestion vocal ends.
                             gap_after_suggestion = section_project_end_time - (suggestion_clip_project_end_time or section_project_start_time)
+                            logger.debug(f"Gap after suggestion vocal: {gap_after_suggestion:.2f}s (Project End: {section_project_end_time:.2f}, Suggestion End: {suggestion_clip_project_end_time:.2f})")
 
                             if suggestion_vocal_clip_added and gap_after_suggestion > VOCAL_GAP_FALLBACK_THRESHOLD:
                                 logger.info(f"Gap of {gap_after_suggestion:.2f}s detected after suggestion vocal. Attempting to fill with anchor vocal.")
@@ -583,7 +623,27 @@ async def create_timeline_from_pairings(
                                         _anchor_beat, av_source_start_time, av_project_start_time = anchor_start_info
                                         av_source_start_time = max(anchor_start_s, min(av_source_start_time, anchor_end_s - FLOAT_TOLERANCE))
                                         av_project_start_time = max(section_project_start_time, min(av_project_start_time, section_project_end_time - FLOAT_TOLERANCE))
-                                        av_source_duration = anchor_end_s - av_source_start_time
+                                        anchor_bleed_through_time = 0.0
+                                        # Check if there is a next section and if it's contiguous
+                                        if (i + 1) < len(pairings):
+                                            next_anchor_section = pairings[i+1][0]
+                                            gap_to_next_section = next_anchor_section.start_time_s - anchor_end_s
+                                            if gap_to_next_section <= SECTION_GAP_THRESHOLD:
+                                                logger.debug(f"Contiguous next section found. Checking for bleed-through potential.")
+                                                next_melody = parse_melody_or_cp_data(next_anchor_section.melody)
+                                                next_bpm = next_anchor_section.bpm
+                                                logger.debug(f"Next section BPM: {next_bpm}, Melody notes: {len(next_melody) if next_melody else 0}")
+                                                if next_melody and next_bpm and next_bpm > 0:
+                                                    bleed_beats = find_initial_phrase_duration_beats(next_melody)
+                                                    logger.debug(f"Initial phrase duration in next section: {bleed_beats:.2f} beats")
+                                                    if bleed_beats > 0:
+                                                        bleed_seconds = beats_to_seconds(bleed_beats, next_bpm)
+                                                        if bleed_seconds:
+                                                            # Bleed time is the duration of the initial phrase in the next section's source
+                                                            anchor_bleed_through_time = bleed_seconds
+                                                            logger.info(f"Calculated anchor bleed-through of {bleed_beats:.2f} beats ({anchor_bleed_through_time:.2f}s) into next section.")
+
+                                        av_source_duration = (anchor_end_s - av_source_start_time) + anchor_bleed_through_time
 
                                         if av_source_duration > FLOAT_TOLERANCE:
                                             logger.info(f"Adding anchor vocal transition clip...")
