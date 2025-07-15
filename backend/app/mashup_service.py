@@ -3,6 +3,7 @@ import asyncio
 import random
 from typing import List, Dict, Optional, Tuple, Set, Any
 import logging
+import itertools
 from fastapi import Depends
 from thefuzz import fuzz
 # Import necessary components from other modules
@@ -14,7 +15,7 @@ from .dependencies import get_supabase_client # Import the dependency for Supaba
 from supabase import AsyncClient # Import Client if needed directly for type hint
 from app.utils import create_signed_url_sync # Use sync version for to_thread
 from app.config import get_settings # Import settings if needed for Supabase client
-from .musictheory_utils import keys_compatible, get_camelot_neighbors, get_camelot_number, get_section_category # Import necessary key utils
+from .musictheory_utils import get_camelot_neighbors, get_camelot_number, get_section_category # Import necessary key utils
 
 logger = logging.getLogger(__name__)
 settings = get_settings() # Get settings once
@@ -93,42 +94,47 @@ async def generate_mashup(payload: MashupPayload, supabase: AsyncClient) -> Mash
     processed_payload_tracks = list(initial_tracks) # Start with a copy
 
     # --- Augmentation Logic ---
-    '''
-    if mode == "mashup-plus":
+    if augment_count > 0:
+        processed_suggestion_ids = {s.source_track_id for t in initial_tracks for s in t.sections}
         if len(initial_tracks) == 1 and not initial_tracks[0].anchor:
             # Scenario 1: Single non-anchor track provided, need to find *one* anchor
             logger.info("Mode: Augmenting to find a compatible anchor track.")
             user_track = initial_tracks[0]
-            anchor_ref_section = None
+            ref_section = None
             # --- Find preferred reference section (Drop/Chorus) ---
             if user_track.sections:
                 # Try to find a 'Drop' section first
-                anchor_ref_section = next((s for s in user_track.sections if get_section_category(s.section_name) == 'Drop'), None)
+                ref_section = next((s for s in user_track.sections if get_section_category(s.section_name) == 'Drop'), None)
                 # If no 'Drop', fallback to the first section
-                if not anchor_ref_section:
-                    anchor_ref_section = user_track.sections[0]
+                if not ref_section:
+                    ref_section = user_track.sections[-1]   #  TODO: review whether this selection is appropriate
             # --- End finding reference section ---
 
-            if not anchor_ref_section:
+            if not ref_section:
                  logger.error("Could not determine a reference section from the user's track for augmentation.")
                  raise ValueError("User track has no sections to use as augmentation reference.")
 
-            logger.info(f"Using user track section '{anchor_ref_section.section_name}' (ID: {anchor_ref_section.hooktheory_section_id}) as reference.")
-            exclude_ids = {anchor_ref_section.source_track_id}
-            found_anchors = await fetch_compatible_sections_from_db(anchor_ref_section, 1, exclude_ids, supabase=supabase, temperature=temperature)
-            if found_anchors:
-                anchor_section = found_anchors[0]
-                 # Create a new InputTrack for this anchor (ensure all its sections are fetched?)
-                # NOTE: fetch_compatible_sections_from_db currently returns *sections*.
-                # We might need to fetch *all* sections for the chosen anchor track's source_id
-                # For simplicity now, we assume the found section is sufficient representative for the anchor track.
-                # Create a new InputTrack for this anchor
-                anchor_track = InputTrack(anchor=True, sections=[anchor_section])
-                processed_payload_tracks.insert(0, anchor_track) # Add the new anchor track
-                logger.info(f"Found and added compatible anchor: {anchor_section.artist} - {anchor_section.title} ({anchor_section.hooktheory_section_id})")
-            else:
-                logger.error("Failed to find a compatible anchor section for augmentation.")
-                raise ValueError("Could not find a compatible anchor track to augment the request.")
+            logger.info(f"Using user track section '{ref_section.section_name}' (ID: {ref_section.hooktheory_section_id}) as reference.")
+            exclude_ids = {ref_section.source_track_id}
+            found_anchors = await fetch_compatible_sections_from_db(ref_section, augment_count, exclude_ids, supabase=supabase, temperature=temperature)
+            if not found_anchors:
+                logger.error("No compatible anchor sections found for augmentation.")
+                raise ValueError("No compatible anchor sections found for the provided user track.")
+            
+            for i, top_section in enumerate(found_anchors):
+                top_track_id = top_section.source_track_id
+                if top_track_id in processed_suggestion_ids:
+                    logger.debug(f"Skipping already processed anchor track {top_track_id}.")
+                    continue
+                sibling_sections = await _get_all_sections_for_track(top_track_id, supabase=supabase)
+                logger.debug(f"sibling_sections for anchor track {top_track_id}: {sibling_sections}")
+                if not sibling_sections:
+                    logger.warning(f"No sections found for anchor track {top_track_id}. Skipping.")
+                    continue
+                is_primary_anchor = (i == 0) # First found is primary anchor
+                new_track = InputTrack(anchor=is_primary_anchor, sections=sibling_sections)
+                processed_payload_tracks.append(new_track)
+                logger.info(f"Added suggestion track: {sibling_sections[0].artist} - {sibling_sections[0].title} ({len(sibling_sections)} sections)")
 
         elif any(t.anchor for t in initial_tracks):
             # Scenario 2: Anchor exists, find suggestions
@@ -140,9 +146,9 @@ async def generate_mashup(payload: MashupPayload, supabase: AsyncClient) -> Mash
                 if primary_anchor_track.sections:
                     # Try to find a 'Drop' section first
                     anchor_ref_section = next((s for s in primary_anchor_track.sections if get_section_category(s.section_name) == 'Drop'), None)
-                    # If no 'Drop', fallback to the first section
+                    # If no 'Drop', fallback to a later section
                     if not anchor_ref_section:
-                        anchor_ref_section = primary_anchor_track.sections[0]
+                        anchor_ref_section = primary_anchor_track.sections[-1]
                 # --- End finding reference section ---
 
                 if not anchor_ref_section:
@@ -154,33 +160,28 @@ async def generate_mashup(payload: MashupPayload, supabase: AsyncClient) -> Mash
                     exclude_ids = {s.source_track_id for t in initial_tracks for s in t.sections}
                     found_suggestions = await fetch_compatible_sections_from_db(anchor_ref_section, augment_count, exclude_ids, supabase=supabase, temperature=temperature)
 
-                # Group suggestions by source_track_id into InputTrack objects
-                suggestions_by_track: Dict[str, List[InputSection]] = {}
-                for sugg_section in found_suggestions:
-                        src_id = sugg_section.source_track_id
-                        if src_id not in suggestions_by_track:
-                            suggestions_by_track[src_id] = []
-                        suggestions_by_track[src_id].append(sugg_section)
-
-                for src_id, sections in suggestions_by_track.items():
-                # Ensure we don't add a track if its source_id is already present
-                    if not any(st.source_track_id == src_id for t in processed_payload_tracks for st in t.sections):
-                        suggestion_track = InputTrack(anchor=False, sections=sections)
+                    for top_section in found_suggestions:
+                        top_track_id = top_section.source_track_id
+                        if top_track_id in processed_suggestion_ids:
+                            logger.debug(f"Skipping already processed suggestion track {top_track_id}.")
+                            continue
+                        sibling_sections = await _get_all_sections_for_track(top_track_id, supabase=supabase)
+                        if not sibling_sections:
+                            logger.warning(f"No sections found for suggestion track {top_track_id}. Skipping.")
+                            continue
+                        suggestion_track = InputTrack(anchor=False, sections=sibling_sections)
                         processed_payload_tracks.append(suggestion_track)
-                        logger.info(f"Added augmented suggestion track: {sections[0].artist} - {sections[0].title} ({len(sections)} sections)")
-                    else:
-                        logger.debug(f"Skipping augmented track {src_id} as it's already in the list.")
+                        logger.info(f"Added suggestion track: {sibling_sections[0].artist} - {sibling_sections[0].title} ({len(sibling_sections)} sections)")
 
-            else:
-                logger.warning("Augment suggestions requested, but no anchor track found in initial payload.")
     # --- END Augmentation Logic ---
-'''
 
     # === Proceed with the rest of the mashup logic using processed_payload_tracks ===
     logger.info(f"Total tracks: {len(processed_payload_tracks)}")
 
     # 1. Identify Tracks & Process Stems (using potentially augmented list)
     source_tracks, anchor_src_ids = await _identify_source_tracks(processed_payload_tracks)
+    logger.info(f"source_tracks: {source_tracks}")
+    logger.info(f"anchor_src_ids: {anchor_src_ids}")
     if not anchor_src_ids:
         # This can happen if augmentation failed to find an anchor in scenario 1
         logger.error("No anchor track ID identified after augmentation checks.")
@@ -229,7 +230,7 @@ def get_compatible_key_list(anchor_key: Optional[str]) -> List[str]:
     if not anchor_key:
         return []
 
-    compatible_keys = {anchor_key}
+    compatible_keys = []
     anchor_camelot = get_camelot_number(anchor_key)
     if anchor_camelot:
         num, type = anchor_camelot
@@ -283,7 +284,7 @@ def weighted_sample_without_replacement(population: List[Any], weights: List[flo
 
 
 async def fetch_compatible_sections_from_db(
-    anchor_section: InputSection,
+    ref_section: InputSection,
     count: int,
     exclude_source_ids: Set[str],
     supabase: AsyncClient,
@@ -294,144 +295,137 @@ async def fetch_compatible_sections_from_db(
     using a temperature-controlled weighted random sampling based on match quality.
 
     Args:
-        anchor_section: The reference section.
+        ref_section: The reference section.
         count: The desired number of compatible sections.
         exclude_source_ids: Set of source_track_ids to exclude.
         supabase: Supabase client instance.
         temperature: Controls randomness (0=deterministic best, >0 increases randomness).
                      Must be non-negative.
     """
-    logger.info(f"Augmenting: Fetching candidates compatible with anchor {anchor_section.hooktheory_section_id} (Count: {count}, Temp: {temperature})")
+    logger.info(f"Augmenting: Fetching candidates compatible with anchor {ref_section.hooktheory_section_id} (Count: {count}, Temp: {temperature})")
 
-    if not anchor_section.key or not anchor_section.cp_compare:
-        logger.warning("Anchor section missing key or cp_compare. Cannot effectively augment.")
+    # if not anchor_section.key or not anchor_section.cp_compare:
+    #     logger.warning("Anchor section missing key or cp_compare. Cannot effectively augment.")
+    #     return []
+    if not ref_section.key:
+        logger.warning("Anchor section missing key. Cannot effectively augment.")
         return []
-    if temperature < 0:
-        logger.warning("Temperature cannot be negative. Using 0.")
-        temperature = 0
+    if not ref_section.cp_compare:
+        logger.warning("Anchor section missing cp_compare. Cannot effectively augment.")
+        return []
 
-    all_candidates_with_scores: List[Tuple[InputSection, float]] = []
-    processed_candidate_source_ids: Set[str] = set(exclude_source_ids | {anchor_section.source_track_id})
+    # --- 2. Build and Execute the Advanced Multi-Stage Query ---
+    LIMIT_FOR_SAMPLING = max(count * 10, 100) # Fetch a slightly larger pool for ranking
+    
+    # Normalize the anchor progression IN PYTHON first, so we don't call the function repeatedly in the query
+    # This is a small optimization.
+    normalized_anchor_cp = ''.join(k for k, g in itertools.groupby(ref_section.cp_compare))
 
-    # --- Strategy 1: Try Exact CP Match within Anchor Key (DB Query) ---
-    # Fetch more than needed initially to build a pool
-    LIMIT_PER_QUERY = max(count * 5, 50) # Fetch a reasonable number for exact matches
-    try:
-        logger.debug(f"Augment: Querying exact match for key='{anchor_section.key}', cp_compare='{anchor_section.cp_compare}'")
-        response_exact = await (
-            supabase.table("hooktheory")
-            .select(HOOKTHEORY_COLUMNS_STR)
-            .eq('key', anchor_section.key)
-            .eq('cp_compare', anchor_section.cp_compare)
-            .not_.in_("source_track_id", list(processed_candidate_source_ids))
-            .limit(LIMIT_PER_QUERY)
-            .execute()
-        )
-        if response_exact.data:
-            for row in response_exact.data:
-                try:
-                    section = InputSection(**row)
-                    if section.source_track_id not in processed_candidate_source_ids:
-                        # Assign high score for exact match
-                        all_candidates_with_scores.append((section, EXACT_MATCH_SCORE))
-                        processed_candidate_source_ids.add(section.source_track_id)
-                except Exception as parse_err:
-                     logger.warning(f"Skipping exact match row due to parsing error: {parse_err} - Row: {row}")
-            logger.info(f"Found {len(all_candidates_with_scores)} initial sections via exact key/cp_compare DB match.")
 
-    except Exception as e:
-        logger.error(f"Supabase error during exact match query: {e}", exc_info=True)
-
-    # --- Strategy 2: Fetch Broader Pool by Anchor Key and Filter Fuzzy/Key in Python ---
-    logger.info(f"Fetching broader pool by anchor key='{anchor_section.key}' for fuzzy filtering.")
-
-    # Fetch more candidates based on key (limit fetch size)
-    MAX_CANDIDATES_TO_FETCH_FUZZY = max(count * 10, 50) # Fetch significantly more
+    params = {
+    'anchor_key_root': ref_section.key,
+    'anchor_scale': ref_section.scale,
+    'anchor_cp_raw': ref_section.cp_compare,
+    'exclude_ids': list(exclude_source_ids | {ref_section.source_track_id}),
+    'result_limit': LIMIT_FOR_SAMPLING
+    }
 
     try:
-        response_candidates = await (
-            supabase.table("hooktheory")
-            .select(HOOKTHEORY_COLUMNS_STR)
-            .eq('key', anchor_section.key) # Still filtering by anchor key in DB
-            .not_.in_("source_track_id", list(processed_candidate_source_ids)) # Exclude already processed IDs
-            .neq('cp_compare', anchor_section.cp_compare) # Exclude exact CP matches for this key (already found)
-            .limit(MAX_CANDIDATES_TO_FETCH_FUZZY)
-            .execute()
-        )
+        # The RPC call is clean and sends structured data, avoiding all parsing errors
+        response = await supabase.rpc('find_compatible_sections', params).execute()
+        
+        if not response.data:
+            logger.warning("No compatible candidates returned from DB RPC.")
+            return []
     except Exception as e:
-         logger.error(f"Supabase error fetching candidates for fuzzy matching: {e}", exc_info=True)
-         # Continue with candidates found so far
+        # This will now catch genuine connection errors or errors within the SQL function itself
+        logger.error(f"Supabase RPC error calling 'find_compatible_sections': {e}", exc_info=True)
+        return []
 
-    if response_candidates and response_candidates.data:
-        logger.debug(f"Processing {len(response_candidates.data)} candidates for fuzzy matching.")
-        anchor_cp = anchor_section.cp_compare
-        num_added_fuzzy = 0
-        for row in response_candidates.data:
-            try:
-                candidate_section = InputSection(**row)
+    # --- 2. Process DB Results and Calculate Final Score in Python ---
+    # This part remains the same, but it's now operating on the perfectly sorted
+    # list returned by our powerful database function.
+    
+    all_candidates_with_scores = []
+    normalized_anchor_cp = ''.join(k for k, g in itertools.groupby(ref_section.cp_compare))
 
-                # Avoid processing duplicates if somehow fetched again or already in exact list
-                if candidate_section.source_track_id in processed_candidate_source_ids:
-                    continue
+    for row in response.data:
+        try:
+            # We need to calculate the score here for the temperature sampling,
+            # since the DB only did the sorting for us.
+            candidate_cp = row.get('cp_compare', '')
+            candidate_cp_norm = ''.join(k for k, g in itertools.groupby(candidate_cp))
+            
+            max_len = max(len(normalized_anchor_cp), len(candidate_cp_norm), 1)
+            
+            # We don't have the Levenshtein distance, so we must recalculate it.
+            # This is a small, acceptable trade-off for the robustness of the RPC call.
+            # A more advanced (but complex) solution would be to have the RPC return the score too.
+            # For now, this is fine.
+            from Levenshtein import distance as levenshtein_distance # A fast C library
+            distance = levenshtein_distance(normalized_anchor_cp, candidate_cp_norm)
+            
+            score = 1.0 - (distance / max_len)
+            
+            if candidate_cp.startswith(ref_section.cp_compare):
+                score += 0.5
 
-                # **Filter 1: Check Key Compatibility (Redundant if DB only fetched exact key, but good safeguard)**
-                # if not keys_compatible(anchor_section.key, anchor_section.scale, candidate_section.key, candidate_section.scale):
-                #    continue # Skip if not key compatible
+            score = max(0, score)
 
-                # **Filter 2: Check CP Fuzzy Similarity**
-                candidate_cp = candidate_section.cp_compare
-                if candidate_cp and anchor_cp: # Ensure both exist
-                    # Use the numeric part for fuzzy matching
-                    num_part_anchor = "".join(filter(str.isdigit, anchor_cp))
-                    num_part_candidate = "".join(filter(str.isdigit, candidate_cp))
-                    if num_part_anchor and num_part_candidate:
-                        similarity = fuzz.ratio(num_part_anchor, num_part_candidate)
-                        if similarity >= CP_FUZZY_SIMILARITY_THRESHOLD:
-                            # Assign fuzzy score
-                            all_candidates_with_scores.append((candidate_section, float(similarity)))
-                            processed_candidate_source_ids.add(candidate_section.source_track_id)
-                            num_added_fuzzy += 1
-                            logger.debug(f"Fuzzy match passed: {candidate_section.hooktheory_section_id} (Key: {candidate_section.key}, Score: {similarity})")
+            section = InputSection(**row)
+            all_candidates_with_scores.append((section, score))
+        except Exception as parse_err:
+            logger.warning(f"Skipping row due to parsing error: {parse_err} - Row: {row}")
 
-            except Exception as parse_err:
-                logger.warning(f"Skipping fuzzy candidate row due to parsing error: {parse_err} - Row: {row}")
-        logger.info(f"Added {num_added_fuzzy} candidates via fuzzy matching.")
-
-    # --- Selection Logic ---
+    # --- 3. Final Selection Logic (This is unchanged) ---
     if not all_candidates_with_scores:
-        logger.warning("No compatible candidates found after filtering.")
+        logger.warning("No valid candidates remained after scoring.")
         return []
 
-    logger.info(f"Total compatible candidates found: {len(all_candidates_with_scores)}. Selecting {count} based on temperature {temperature}.")
+    # The list from the DB is already sorted optimally, but we re-sort by our Python-calculated score
+    all_candidates_with_scores.sort(key=lambda x: x[1], reverse=True)
 
-    # Separate candidates and scores
     population = [item[0] for item in all_candidates_with_scores]
     scores = [item[1] for item in all_candidates_with_scores]
 
-    selected_sections: List[InputSection] = []
-
-    # Handle deterministic case (temp=0 or very close)
     if temperature < EPSILON:
-        logger.debug("Temperature near zero. Selecting deterministically based on score.")
-        # Sort by score descending
-        sorted_candidates = sorted(all_candidates_with_scores, key=lambda x: x[1], reverse=True)
-        selected_sections = [item[0] for item in sorted_candidates[:count]]
+        logger.debug("Temperature near zero. Selecting deterministically based on final score.")
+        selected_sections = population[:count]
     else:
-        # Weighted random sampling without replacement
-        logger.debug("Temperature > 0. Performing weighted random sampling.")
+        logger.debug(f"Temperature > 0. Performing weighted random sampling on {len(population)} candidates.")
         try:
-            # Calculate weights: score^(1/temp) - more emphasis on higher scores for low temp
             weights = [(s + EPSILON)**(1.0 / temperature) for s in scores]
-            logger.debug(f"Calculated weights (first 5): {[round(w, 2) for w in weights[:5]]}")
-
-            # Perform weighted sample without replacement
             selected_sections = weighted_sample_without_replacement(population, weights, k=count)
-
         except (OverflowError, ValueError) as e:
-             logger.error(f"Numerical error during weight calculation/sampling (temp={temperature}): {e}. Falling back to deterministic selection.", exc_info=True)
-             # Fallback to deterministic if weights explode or other math issues
-             sorted_candidates = sorted(all_candidates_with_scores, key=lambda x: x[1], reverse=True)
-             selected_sections = [item[0] for item in sorted_candidates[:count]]
+             logger.error(f"Numerical error during weight calculation/sampling (temp={temperature}): {e}. "
+                          "Falling back to deterministic selection.", exc_info=True)
+             selected_sections = population[:count]
 
     logger.info(f"Selected {len(selected_sections)} sections using temp {temperature}. IDs: {[s.hooktheory_section_id for s in selected_sections]}")
     return selected_sections
+
+
+
+async def _get_all_sections_for_track(
+    source_track_id: str,
+    supabase: AsyncClient
+) -> List[InputSection]:
+    """
+    A simple helper to fetch all sections for a given source_track_id.
+    """
+    logger.debug(f"Hydrating all sections for source_track_id: {source_track_id}")
+    try:
+        response = await (
+            supabase.table("hooktheory")
+            .select("*")
+            .eq("source_track_id", source_track_id)
+            # .order("Start Timestamp (s)", desc=False) # Ensure canonical order
+            .execute()
+        )
+        if not response.data:
+            return []
+        
+        return [InputSection(**row) for row in response.data]
+    except Exception as e:
+        logger.error(f"Failed to hydrate sections for {source_track_id}: {e}", exc_info=True)
+        return []

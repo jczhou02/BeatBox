@@ -195,7 +195,7 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
 
   const handleMashup = async (mode: "mashup" | "mashup-plus") => {
     setIsLoadingMashup(true);
-    setDropdownOpen(false); 
+    setIsMashupOptionsVisible(false)
     try {
         console.log('Sending tracks with params:', { localTracks, temperature, count });
         const response = await fetch('/api/mashup', {
@@ -220,7 +220,7 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
         setIsLoadingMashup(false);
         // Reset UI states after mashup is done
         setActiveParam(null);
-        setIsMashupOptionsVisible(false);
+        setDropdownOpen(false); 
     }
   };
 
@@ -425,7 +425,7 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
     // If a parameter is being configured, the first click just closes the config UI
     if (activeParam) {
       setActiveParam(null);
-      setIsMashupOptionsVisible(false);
+      // setIsMashupOptionsVisible(false);
       return;
     }
     // Otherwise, call the API
@@ -569,7 +569,6 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
               className="relative w-full h-10 overflow-hidden" // Parent must hide overflow
               onHoverStart={() => setIsMashupOptionsVisible(true)}
               onHoverEnd={() => {
-                // Don't hide options if a parameter is being actively configured
                 if (activeParam === null) {
                   setIsMashupOptionsVisible(false);
                 }

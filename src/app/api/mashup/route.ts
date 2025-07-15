@@ -54,31 +54,31 @@ function normalizeString(str: string): string {
   interface HooktheorySection {
     id: string; // Section UUID
     source_track_id: string; // Source Track UUID
-    Status?: string;
+    status?: string;
     artist: string;
     title: string;
     section?: string;
-    "Chord Progression"?: string;
+    "chord progression"?: string;
     cp?: string | Record<string, any>; // Chord progression, can be string or object
-    Key?: string;
-    Scale?: string;
-    BPM?: number; // Should be number in DB
-    Meter?: number;
+    key?: string;
+    scale?: string;
+    bpm?: number; // Should be number in DB
+    meter?: number;
     beatUnit?: number;
-    Danceability?: number;
-    Energy?: number;
-    Loudness?: number;
-    Acousticness?: number;
-    Instrumentalness?: number;
-    Liveness?: number;
-    Valence?: number;
-    "Duration (ms)"?: number; // Section duration
-    Genres?: string[]; // Assuming array
-    "Time Signature"?: string;
-    Melody?: string  | Record<string, any>[];
-    "YouTube ID"?: string;
-    "Start Timestamp (s)"?: number;
-    "End Timestamp (s)"?: number;
+    danceability?: number;
+    energy?: number;
+    loudness?: number;
+    acousticness?: number;
+    instrumentalness?: number;
+    liveness?: number;
+    valence?: number;
+    "duration (ms)"?: number; // Section duration
+    genres?: string[]; // Assuming array
+    "time signature"?: string;
+    melody?: string  | Record<string, any>[];
+    youtube_id?: string;
+    "start timestamp (s)"?: number;
+    "end timestamp (s)"?: number;
     cp_compare?: string;
   }
   
@@ -164,21 +164,7 @@ function normalizeString(str: string): string {
       }
   
       let finalTracksToSend = initialTrackData;
-  
-      // 3. Fetch Compatible Sections if in "mashup-plus" mode
-      if (mode === "mashup-plus") {
-        console.log("Mode is mashup-plus, fetching compatible tracks...");
-        try {
-            const compatibleTracks = await fetchCompatibleSections(initialTrackData, numSuggestions);
-            // Combine initial tracks and compatible ones, ensuring no duplicates at the source_track level maybe?
-            // For now, just append. The backend can handle potential redundancy if needed.
-            finalTracksToSend = [...initialTrackData, ...compatibleTracks];
-            console.log(`Added ${compatibleTracks.length} sets of compatible sections.`);
-        } catch(err) {
-            console.error("Failed to fetch compatible tracks:", err);
-            // Decide: proceed without compatible tracks or return error? Let's proceed.
-        }
-      }
+        
   
       // 4. Prepare Data for FastAPI Backend
       // Group sections by source_track_id to potentially send less redundant data?
@@ -191,19 +177,19 @@ function normalizeString(str: string): string {
           artist: s.artist,
           title: s.title,
           section_name: s.section || null,
-          key: s.Key || null,
-          scale: s.Scale || null,
-          bpm: s.BPM ? Math.round(s.BPM) : null, // Ensure BPM is integer
-          chord_progression: s["Chord Progression"] || s.cp || null,
+          key: s.key || null,
+          scale: s.scale || null,
+          bpm: s.bpm ? Math.round(s.bpm) : null, // Ensure BPM is integer
+          chord_progression: s["chord progression"] || s.cp || null,
           cp: s.cp || null,
-          meter: s.Meter || null,
-          melody: s.Melody || null,
-          youtube_id: s["YouTube ID"] || null, // Pass one known YT ID for potential download
-          start_time_s: s["Start Timestamp (s)"] || 0,
-          end_time_s: s["End Timestamp (s)"] || null,
-          section_duration_ms: s["Duration (ms)"] || null,
+          meter: s.meter || null,
+          melody: s.melody || null,
+          youtube_id: s.youtube_id || null, // Pass one known YT ID for potential download
+          start_time_s: s["start timestamp (s)"] || 0,
+          end_time_s: s["end timestamp (s)"] || null,
+          section_duration_ms: s["duration (ms)"] || null,
           cp_compare: s.cp_compare || null,
-          genres: s.Genres || null,
+          genres: s.genres || null,
           beatUnit: s.beatUnit || 1,
         })),
       }));
@@ -293,8 +279,8 @@ function normalizeString(str: string): string {
               if (!track.sections || track.sections.length === 0) return [];
               const refSection = track.sections[0];
   
-              const refKey = refSection.Key;
-              const refBpm = refSection.BPM;
+              const refKey = refSection.key;
+              const refBpm = refSection.bpm;
               const refSourceTrackId = refSection.source_track_id; // Exclude self
   
               if (!refKey || !refBpm) {
@@ -308,7 +294,7 @@ function normalizeString(str: string): string {
               const { data, error } = await supabase
                   .from('hooktheory')
                   .select('*') // Fetch all data for potential use
-                  .eq('Key', refKey) // Match Key exactly (or use Camelot wheel logic)
+                  .eq('key', refKey) // Match Key exactly (or use Camelot wheel logic)
                   .gte('BPM', refBpm - bpmTolerance) // BPM within range
                   .lte('BPM', refBpm + bpmTolerance)
                   .neq('source_track_id', refSourceTrackId) // Don't suggest the same track
