@@ -1,31 +1,29 @@
+// src/app/api/projects/route.ts
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { auth } from '@/auth';
+import { supabaseAdmin } from '@/lib/supabaseClient';
+import { Project } from '@/types';
 
-// Fetch all projects for the logged-in user
-export async function GET(req: Request) {
-  const { user_id } = await req.json();
-  if (!user_id) return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+export async function POST(request: Request) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  const { data, error } = await supabase
+  const projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'user_id'> = await request.json();
+
+  const {data, error} = await supabaseAdmin
     .from('projects')
-    .select('*')
-    .eq('user_id', user_id);
+    .insert({
+      ...projectData,
+      user_id: session?.user?.id,
+    })
+    .select()
+    .single();
 
-  return error
-    ? NextResponse.json({ error }, { status: 500 })
-    : NextResponse.json({ projects: data });
-}
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
-// Save a new project
-export async function POST(req: Request) {
-  const { user_id, title, tracks } = await req.json();
-  if (!user_id) return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
-
-  const { data, error } = await supabase
-    .from('projects')
-    .insert([{ user_id, title, tracks }]);
-
-  return error
-    ? NextResponse.json({ error }, { status: 500 })
-    : NextResponse.json({ message: 'Project saved successfully', project: data });
+  return NextResponse.json(data, { status: 201 });
 }

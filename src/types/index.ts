@@ -1,3 +1,5 @@
+import { UUID } from "crypto";
+
 export interface BaseTrack {
   id: string;
   name: string;
@@ -40,11 +42,14 @@ export type Track = SpotifyTrack | UploadedTrack;
   export interface Project {
     id: string;
     name: string;
+    description: string | "";
     bpm: number;
-    key?: string;
+    key: string | null;
     tracks: Track[];
+    mashupData: MashupData | null;
     createdAt: Date;
     updatedAt: Date;
+    user_id: string; 
   }
   
 

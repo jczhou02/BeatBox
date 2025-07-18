@@ -100,6 +100,7 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
   const [isLoadingMashup, setIsLoadingMashup] = useState(false);
   const [isPanningWheel, setIsPanningWheel] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
+  const [lastActiveParam, setLastActiveParam] = useState<'temperature' | 'count' | null>(null);
 
   // --- Existing Dimensions ---
   const containerSize = 500;
@@ -134,6 +135,11 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
   }, [isPanningWheel]);
 
 
+  useEffect(() => {
+    if (activeParam !== null) {
+      setLastActiveParam(activeParam);
+    }
+  }, [activeParam]);
 
   // --- Existing Effects & Handlers (collapsed for brevity) ---
   useEffect(() => {
@@ -267,7 +273,8 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
       },
   }), []);
 
-  const activeWheelThickness = (activeParam ? wheelConfigs[activeParam].thickness : 20);
+  const paramForSizing = activeParam || lastActiveParam;
+  const activeWheelThickness = (paramForSizing ? wheelConfigs[paramForSizing].thickness : 20);
   const totalSize = containerSize + activeWheelThickness * 2;
 
   const handlePanStart = useCallback((e: MouseEvent | TouchEvent, info: PanInfo) => {
@@ -318,23 +325,51 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
     // Use the ref to get the CURRENT active parameter
     if (activeParamRef.current === 'count') {
         // Use a functional update to get the LATEST wheelRotation value
-        setWheelRotation(currentRotation => {
-            const anglePerTick = 360 / (MAX_COUNT + 1);
-            const closestTickIndex = Math.round(-currentRotation / anglePerTick);
-            const targetRotation = -closestTickIndex * anglePerTick;
-            
-            // Animate from the latest value to the target
-            animate(currentRotation, targetRotation, {
-                type: "spring", stiffness: 800, damping: 40,
-                onUpdate: latest => setWheelRotation(latest),
-            });
-            
-            // The return value for the setter is the immediate rotation before animation
-            return currentRotation; 
-        });
-    }
+      const anglePerTick = 360 / (MAX_COUNT + 1);
+      const closestTickIndex = Math.round(-wheelRotation / anglePerTick);
+      const targetRotation = -closestTickIndex * anglePerTick;
+      
+      // Animate from the latest value to the target
+      animate(wheelRotation, targetRotation, {
+          type: "spring", stiffness: 800, damping: 40,
+          onUpdate: latest => setWheelRotation(latest),
+      });
+}
     setIsPanningWheel(false);
-  }, []); 
+  }, [wheelRotation]); 
+
+
+  const handleCountChangeFromHUD = (newCount: number) => {
+    // Ensure the value is within the valid range.
+    if (newCount < 0 || newCount > MAX_COUNT) return;
+
+    // If the count wheel isn't active, activate it for better user feedback.
+    if (activeParam !== 'count') {
+      setActiveParam('count');
+    }
+
+    // This is the reverse of the logic in our useEffect.
+    // We calculate the target rotation angle for the desired count.
+    const anglePerTick = 360 / (MAX_COUNT + 1);
+    const targetRotation = -newCount * anglePerTick;
+
+    // Stop any ongoing pan-related animation before starting a new one.
+    animate(wheelRotation, wheelRotation, { onUpdate: v => setWheelRotation(v) }).stop();
+
+    // Animate the wheel from its current rotation to the new target rotation.
+    // This provides a smooth visual transition.
+    animate(wheelRotation, targetRotation, {
+        type: "spring",
+        stiffness: 500,
+        damping: 40,
+        onUpdate: latest => setWheelRotation(latest), // This is crucial!
+    });
+
+    // We DO NOT call setCount(newCount) here.
+    // The `onUpdate` above will trigger the useEffect below, which will
+    // derive the new count from the wheel's rotation, keeping them in sync.
+  };
+
 
 
   const activeConfig = useMemo(() => {
@@ -356,7 +391,7 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
           // The double modulo handles negative numbers correctly
           const newCount = (currentTick % (MAX_COUNT + 1) + (MAX_COUNT + 1)) % (MAX_COUNT + 1);
 
-          if (newCount !== count) {
+          if( newCount !== count) {
               setCount(newCount);
           }
       }
@@ -438,7 +473,15 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
     <div className="fixed inset-0 flex items-center justify-center z-50">
       {/* Backdrop */}
       <div className={`absolute inset-0 bg-black/70 backdrop-blur-sm ${isPanningWheel ? 'pointer-events-none' : ''}`} onClick={onClose} />
-      
+          <div className="absolute top-20 mr-72 mb-4 z-20">
+            <MashupHUD 
+              temperature={temperature} 
+              count={count} 
+              maxCount={MAX_COUNT} 
+              onTemperatureChange={setTemperature} 
+              onCountChange={handleCountChangeFromHUD}
+            />
+          </div>
       <div
         className="relative"
         style={{ width: totalSize, height: totalSize }}

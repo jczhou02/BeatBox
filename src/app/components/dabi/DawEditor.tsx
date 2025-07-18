@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+'use client'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSession, signIn } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
 import { Project, Track, UploadedTrack, MashupData } from '@/types';
 import { TransportControls } from './TransportControls';
 import { TrackList } from './TrackList';
@@ -8,32 +11,48 @@ import BottomMusicBar from './BottomMusicBar';
 import MashupVisualizer from './MashupVisualizer';
 import { SpotifyPlayerProvider } from '@/context/SpotifyPlayerProvider';
 import { FaFileAudio } from 'react-icons/fa';
+import { CgSpinner } from 'react-icons/cg';
+import { toast } from 'react-hot-toast';
 
 interface DawEditorProps {
   initialProject: Project;
-  onSave: (project: Project) => void; 
+  onSave: (project: Project) => Promise<Project | void>; 
   // You can pass an optional callback to "save" the project if you want
   isNew?: boolean; 
   // Maybe you want to treat new projects differently
 }
 
+const PENDING_SAVE_KEY = 'unsavedDabiProject';
+const LOGIN_INTENT_KEY = 'dabiLoginRedirect';
 
 export const DawEditor: React.FC<DawEditorProps> = ({
   initialProject,
   onSave,
   isNew = false
 }) => {
+  const { data: session, status } = useSession();
+
   const [project, setProject] = useState<Project>(initialProject);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState(project.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const initialProjectRef = useRef(initialProject);
+
   const [showUpload, setShowUpload] = useState(false);
   const [gradientColors, setGradientColors] = useState({
     topRight: ['#095b63', '#6623D1', '#904314'],
     bottomLeft: ['#3a0647', '#89216b', '#4f0e5b'],
     bottomRight: ['#1e3b70', '#2a6bb8', '#097969']
   });
-  const [mashupData, setMashupData] = useState<MashupData | null>(null);
   const [softTracks, setSoftTracks] = useState<Track[]>([]);
   const [showMashupVisualizer, setShowMashupVisualizer] = useState(false);
 
+  const mashupData = project.mashupData;
+  const lastSavedProjectRef = useRef(initialProject);
+  const pathname = usePathname();
   const {
     isLoaded,
     isPlaying,
@@ -85,7 +104,7 @@ export const DawEditor: React.FC<DawEditorProps> = ({
 
   const handleMashupComplete = useCallback((newMashupData: MashupData) => {
     console.log("DawEditor received new mashup data, updating state:", newMashupData);
-    setMashupData(newMashupData); // Update the correct state variable
+    setProject(prev => ({ ...prev, mashupData: newMashupData }));
     setShowMashupVisualizer(false); // Close the modal
   }, []);
 
@@ -96,6 +115,173 @@ export const DawEditor: React.FC<DawEditorProps> = ({
   useEffect(() => {
     generateRandomGradient();
   }, []);
+
+
+  useEffect(() => {
+    if (!isNew) return;
+    const loginIntent = sessionStorage.getItem(LOGIN_INTENT_KEY);
+    const pendingProjectJSON = localStorage.getItem(PENDING_SAVE_KEY);
+
+    if (loginIntent === 'true' && pendingProjectJSON) {
+      console.log("LOGIN INTENT DETECTED: Hydrating project state from localStorage.");
+      try {
+        const pendingProject = JSON.parse(pendingProjectJSON);
+        setProject(pendingProject); // This triggers a re-render with the user's data
+      } catch (e) {
+        console.error("Failed to parse pending project from localStorage", e);
+        // Clean up bad data if parsing fails
+        localStorage.removeItem(PENDING_SAVE_KEY);
+      } finally {
+        // IMPORTANT: Clear the intent flag so this doesn't run again on a simple page refresh
+        sessionStorage.removeItem(LOGIN_INTENT_KEY);
+      }
+    }
+  }, [isNew]);
+
+
+  // --- CHANGE DETECTION ---
+  useEffect(() => {
+    // Compare current project state with the initial state to set the dirty flag
+    const isDifferent = JSON.stringify(project) !== JSON.stringify(initialProjectRef.current);
+    setIsDirty(isDifferent);
+  }, [project]);
+
+
+  // --- NEW: POST-LOGIN AUTOMATIC SAVE ---
+  useEffect(() => {
+    if (!isNew) return;
+    const pendingProjectJSON = localStorage.getItem(PENDING_SAVE_KEY);
+    
+    if (pendingProjectJSON && status === 'authenticated' && session?.user?.id) {
+      console.log("User is authenticated and a pending project exists. Triggering auto-save.");
+      
+      localStorage.removeItem(PENDING_SAVE_KEY);
+
+      const performAutomaticSave = async () => {
+        setIsSaving(true);
+        try {
+          // The `project` state is already hydrated with the user's work.
+          // We just need to add the user_id before saving.
+          const projectToSave = { ...JSON.parse(pendingProjectJSON), user_id: session.user.id as string };
+          
+          const savedProject = await onSave(projectToSave);
+          // onSave will likely redirect, but if it doesn't, we update the state
+          if (savedProject) {
+              setProject(savedProject);
+              lastSavedProjectRef.current = savedProject;
+              setIsDirty(false);
+          }
+
+        } catch (error) {
+          console.error("Automatic save failed:", error);
+          toast.error("We couldn't automatically save your project. Please try saving again.");
+          // Put the data back so the user can retry manually
+          localStorage.setItem(PENDING_SAVE_KEY, JSON.stringify(project));
+        } finally {
+          setIsSaving(false);
+        }
+      };
+
+      performAutomaticSave();
+    }
+  }, [status, session, onSave, project, isNew]);
+
+
+  // --- MODIFIED: SAVE LOGIC ---
+  const handleSave = useCallback(async () => {
+    if (!isDirty || isSaving) return;
+
+    if (status === 'authenticated') {
+      setIsSaving(true);
+      try {
+        const projectWithUser = {...project, user_id: session?.user?.id as string};
+        const savedProject = await onSave(projectWithUser);
+        // onSave may redirect. If not, update state to reflect the saved version.
+        if (savedProject) {
+          lastSavedProjectRef.current = savedProject;
+          setProject(savedProject);
+        } else {
+          // If onSave doesn't return the project, assume the current state is the saved state
+          lastSavedProjectRef.current = project;
+          setIsDirty(false);
+        }
+      } catch (error) {
+        console.error("Save failed:", error);
+        toast.error("Failed to save project.");
+      } finally {
+        setIsSaving(false);
+      }
+    } 
+    else {
+      // Unauthenticated flow
+      const confirmation = window.confirm(
+        "You need to log in to save your work.\n\nWe'll save your project automatically after you log in with Spotify. Continue?"
+      );
+
+      if (confirmation) {
+        try {
+          // Store current state and set intent flags
+          localStorage.setItem(PENDING_SAVE_KEY, JSON.stringify(project));
+          sessionStorage.setItem(LOGIN_INTENT_KEY, 'true');
+          // Initiate login
+          console.log("Redirecting to Spotify login with callback URL:", pathname);
+          signIn('spotify', { callbackUrl: `${window.location.origin}${pathname}` });
+        } catch (error) {
+          console.error("Could not save state to localStorage:", error);
+          toast.error("Could not prepare your project for saving. Please try again.");
+        }
+      }
+    }
+  }, [project, isDirty, isSaving, onSave, status, session, pathname]);
+
+
+  // --- KEYBOARD SHORTCUTS ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSave]);
+
+  // --- PROJECT NAME EDITING ---
+  useEffect(() => {
+    if (isEditingName) {
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    }
+  }, [isEditingName]);
+
+  const handleNameClick = () => {
+    setTempName(project.name);
+    setIsEditingName(true);
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTempName(e.target.value);
+  };
+
+  const handleNameBlur = () => {
+    setIsEditingName(false);
+    // Revert changes if clicked outside
+    setTempName(project.name);
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (tempName.trim() && tempName !== project.name) {
+        setProject(p => ({ ...p, name: tempName.trim() }));
+      }
+      setIsEditingName(false);
+    } else if (e.key === 'Escape') {
+      setIsEditingName(false);
+      setTempName(project.name);
+    }
+  };
 
   const generateRandomGradient = () => {
     // Palette of colors to choose from
@@ -140,6 +326,15 @@ export const DawEditor: React.FC<DawEditorProps> = ({
   }), [gradientColors]);
 
 
+  if (isSaving && localStorage.getItem(PENDING_SAVE_KEY) === null) {
+      return (
+          <div className="flex flex-col items-center justify-center h-screen text-white">
+              <CgSpinner className="animate-spin text-4xl mb-4" />
+              <p>Saving your project...</p>
+          </div>
+      );
+  }
+
   return (
   <SpotifyPlayerProvider>
     <div className="min-h-screen p-3 relative" style={backgroundStyle}>    {/* <div className="absolute inset-0 bg-black bg-opacity-50" /> */}
@@ -153,24 +348,52 @@ export const DawEditor: React.FC<DawEditorProps> = ({
       </button>
       {/* Top bar, project name, etc. */}
       <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">
-          {project.name}{isNew ? ' *' : ''}
-        </h1>
-        <div className='flex space-x-2'>
-        <button
-              className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white"
-              onClick={handleMashup}
+          {isEditingName ? (
+            <input
+              ref={nameInputRef}
+              type="text"
+              value={tempName}
+              onChange={handleNameChange}
+              onBlur={handleNameBlur}
+              onKeyDown={handleNameKeyDown}
+              className="text-2xl font-bold bg-transparent border-b-2 border-pink-500 text-white outline-none"
+            />
+          ) : (
+            <h1
+              className="text-2xl font-bold text-white cursor-pointer hover:bg-white/10 p-1 rounded"
+              onClick={handleNameClick}
+              title="Click to edit name"
             >
-              Mashup
-            </button>
+              {project.name}{isDirty ? ' *' : ''}
+            </h1>
+          )}
+
+          <div className='flex items-center space-x-2'>
           <button
-            className="bg-[#0c0d0e] hover:bg-green-700 px-1.5 py-1.5 rounded text-white"
-            onClick={() => setShowUpload(true)}
-          >
-            <FaFileAudio />
-          </button>
-        </div>
-      </header>
+                className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white"
+                onClick={handleMashup}
+              >
+                Mashup
+              </button>
+            <button
+              className="bg-[#0c0d0e] hover:bg-green-700 px-2 py-2 rounded text-white"
+              onClick={() => setShowUpload(true)}
+            >
+              <FaFileAudio />
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!isDirty || isSaving}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed px-1.5 py-1.5 rounded text-white flex items-center space-x-2"
+            >
+              {isSaving ? (
+                <CgSpinner className="animate-spin" />
+              ) : (
+                <span>Save</span>
+              )}
+            </button>
+          </div>
+        </header>
 
       {/* Transport controls */}
       <TransportControls

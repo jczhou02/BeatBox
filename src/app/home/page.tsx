@@ -14,6 +14,7 @@ export default function Home() {
 
   useEffect(() => {
     if (status === 'authenticated' && session?.accessToken) {
+      console.log('user_id: ', session?.user?.id);
       const now = Date.now();
 
       // Check localStorage for cached data and last fetch timestamp

@@ -30,16 +30,20 @@ export const MashupHUD: React.FC<MashupHUDProps> = ({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full mb-4 w-80 p-4 bg-gray-900/70 backdrop-blur-md rounded-lg shadow-2xl border border-white/20 z-50"
+      className="absolute top-0 left-1/4 -translate-x-1/2 -translate-y-full w-70 p-4 bg-gray-900/70 backdrop-blur-md rounded-lg shadow-2xl border border-white/20 z-50"
     >
       <div className="space-y-4">
         {/* Temperature Control */}
-        <div className="flex items-center space-x-3 text-white">
+        <div className="flex items-center space-x-2 text-white">
           <FaThermometerHalf className="text-orange-400" size={20} />
-          <label htmlFor="temp-slider" className="font-semibold w-28">
+          <label htmlFor="temp-slider" className="font-semibold w-20">
             Creativity
           </label>
-          <input
+          <div className='flex flex-col'>
+             <span className="font-mono text-lg w-12 text-right absolute top-0 ml-10">
+                {temperature.toFixed(2)}
+            </span>
+            <input
             id="temp-slider"
             type="range"
             min="0"
@@ -49,9 +53,7 @@ export const MashupHUD: React.FC<MashupHUDProps> = ({
             onChange={(e) => onTemperatureChange(parseFloat(e.target.value))}
             className="flex-grow h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
           />
-          <span className="font-mono text-lg w-12 text-right">
-            {temperature.toFixed(2)}
-          </span>
+          </div>
         </div>
 
         {/* Count Control */}

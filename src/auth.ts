@@ -1,4 +1,4 @@
-import NextAuth from 'next-auth';
+import NextAuth, { DefaultSession } from 'next-auth';
 import "next-auth/jwt"
 import SpotifyProvider from 'next-auth/providers/spotify';
 import { SupabaseAdapter } from '@auth/supabase-adapter';
@@ -16,19 +16,31 @@ export const {handlers, auth, signIn, signOut,} = NextAuth({
     signIn: "/auth/signin",
   },
   callbacks: {
-    async jwt({token,trigger,session,account}){
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      
+      // Allows callback URLs on the same origin
+      if (new URL(url).origin === baseUrl) return url;
+
+      // Fallback to a safe default if the redirect URL is not from your domain.
+      console.warn(`Redirect URL ${url} is not from the same origin as baseUrl ${baseUrl}. Redirecting to baseUrl.`);
+      return baseUrl;
+    },
+
+    async jwt({token,user,trigger,session,account}){
         if (trigger === "update") token.name = session.user.name
-        if (account) {
-          console.log("Account details received, updating token.");
+        if (account && user) {
+          console.log(`Account details received for ${user.name}, updating token.`);
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;
           token.expiresAt = account.expires_at ? account.expires_at * 1000 : Date.now() + 3600 * 1000;
+          token.id = user.id;
           return token;
         }
         const expiresAt = token.expiresAt ?? 0;
         //console.log("Time until expiration (in hours):", (token.expiresAt - Date.now()) / (1000 * 3600));
         if (Date.now() < expiresAt) {
-          console.log("JWT Callback: Token is still valid.");
+          console.log(`JWT Callback: Token is still valid.`);
           return token; // Token still valid
         }
       
@@ -43,11 +55,13 @@ export const {handlers, auth, signIn, signOut,} = NextAuth({
     },
     async session({session,token}){
       if (token.accessToken) {
-        session.accessToken = token.accessToken;
-      } else {
-        console.error("Session Callback: Missing accessToken");
+        session.accessToken = token.accessToken as string;
+      } 
+      if (token.sub) { // `token.sub` is the standard JWT property for user ID
+        session.user.id = token.sub;
       }
-      return session
+      
+      return session;
     }
 },
 });
@@ -55,6 +69,9 @@ export const {handlers, auth, signIn, signOut,} = NextAuth({
 declare module "next-auth" {
   interface Session {
       accessToken?: string
+      user: {
+          id?: string; 
+      } & DefaultSession["user"];
   }
 }
 
@@ -63,6 +80,7 @@ declare module "next-auth/jwt"{
       accessToken?: string
       refreshToken?: string;
       expiresAt?: number;
+      id?: string; 
   }
 }
 
