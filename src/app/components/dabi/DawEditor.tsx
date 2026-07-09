@@ -13,6 +13,8 @@ import { SpotifyPlayerProvider } from '@/context/SpotifyPlayerProvider';
 import { FaFileAudio } from 'react-icons/fa';
 import { CgSpinner } from 'react-icons/cg';
 import { toast } from 'react-hot-toast';
+import CollapsibleSection from '../CollapsibleSection';
+import MashupTable from './MashupTable/Table';
 
 interface DawEditorProps {
   initialProject: Project;
@@ -51,6 +53,7 @@ export const DawEditor: React.FC<DawEditorProps> = ({
   const [showMashupVisualizer, setShowMashupVisualizer] = useState(false);
 
   const mashupData = project.mashupData;
+  const curateData = project.curateData;
   const lastSavedProjectRef = useRef(initialProject);
   const pathname = usePathname();
   const {
@@ -408,37 +411,60 @@ export const DawEditor: React.FC<DawEditorProps> = ({
       />
 
       {/* Tracks */}
-      <div className="my-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-white">Mashup Timeline</h2>
+      <div>
+          <div className="my-6">
+            <CollapsibleSection title="Mashup Timeline" defaultOpen>
+              {!mashupData && (
+              <div className="text-gray-500 text-center py-16 border-2 border-dashed border-gray-700 rounded-lg">
+                <p>Your generated mashup will appear here!</p>
+                <p className="text-sm">Use the &apos;Mashup&apos; button to begin.</p>
+              </div>
+            )}
+
+            {mashupData && !isLoaded && (
+              <div className="text-blue-400 text-center py-16">Loading audio assets...</div>
+            )}
+
+            {isLoaded && mashupData ? (
+              <TrackList
+                mashupData={mashupData}
+                currentTime={currentTime}
+                totalDuration={totalDuration}
+                onMute={toggleMute}
+                onSolo={toggleSolo}
+                onUpdateTrackProperty={updateTrackProperty}
+              />
+            ) : (
+              <p className="text-gray-400 text-center py-8">
+                Create a mashup to see the audio timeline here.
+              </p>
+            )}
+            </CollapsibleSection> 
           </div>
-
-          {!mashupData && (
-            <div className="text-gray-500 text-center py-16 border-2 border-dashed border-gray-700 rounded-lg">
-              <p>Your generated mashup will appear here.</p>
-              <p className="text-sm">Use the &apos;Create Mashup&apos; button to begin.</p>
-            </div>
-          )}
-
-          {mashupData && !isLoaded && (
-             <div className="text-blue-400 text-center py-16">Loading audio assets...</div>
-          )}
-
-          {isLoaded && mashupData ? (
-            <TrackList
-              mashupData={mashupData}
-              currentTime={currentTime}
-              totalDuration={totalDuration}
-              onMute={toggleMute}
-              onSolo={toggleSolo}
-              onUpdateTrackProperty={updateTrackProperty}
-            />
-          ) : (
-            <p className="text-gray-400 text-center py-8">
-              Create a mashup to see the timeline here.
-            </p>
-          )}
-        </div>
+          <div className='my-6'>
+            <CollapsibleSection title="Mashup Table" defaultOpen>
+              {curateData && softTracks.length ? (
+              <MashupTable
+                softTracks={softTracks as any} // matches IncomingTrack type: name, artists[], anchor?
+                onRemove={(title, artist) => {
+                  setSoftTracks(prev => prev.filter(t => !(t.name === title && "artists" in t && t.artists?.[0]?.name && t.artists.map(a => a.name).join(", ") === artist)));
+                }}
+              />
+            ) : (
+              <>
+              <div className="text-gray-500 text-center py-16 border-2 border-dashed border-gray-700 rounded-lg">
+                <p>Your curated table will appear here!</p>
+                <p className="text-sm">Use the &apos;Mashup&apos; button to begin.</p>
+              </div>
+              <p className="text-gray-400 text-center py-8">
+                Create a mashup to see the timeline here.
+              </p>
+              </>
+            )}
+            </CollapsibleSection>
+          </div>
+      </div>
+        
 
       {/* Upload Modal */}
       {showUpload && (

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 // import { supabase } from '@/lib/supabaseClient';
 import { createClient } from '@supabase/supabase-js'; // Use standard client for server-side
 import { z } from 'zod';
+import { normalizeString, HooktheorySection, ProcessedTrackData} from '@/app/utils/mashup/utils'
 
 // Environment variables validation (optional but good practice)
 const envSchema = z.object({
@@ -13,9 +14,6 @@ const envSchema = z.object({
 });
 const env = envSchema.parse(process.env);
 
-interface Artist {
-    name: string;
-  }
   
 // Initialize Supabase client for server-side route handlers
 // Use anon key here; restrict sensitive operations via RLS or backend service role
@@ -40,53 +38,6 @@ const RequestBodySchema = z.object({
 });
 
 
-function normalizeString(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/\(.*?\)/g, ' ') // Remove content in parentheses
-    .replace(/\[.*?\]/g, ' ') // Remove content in brackets
-    .replace(/\b(feat\.?|featuring|ft)\b/g, ' ft ') // Normalize features
-    .replace(/[^\w\s']|_/g, ' ') // Remove punctuation except spaces and apostrophes
-    .replace(/\s+/g, ' ') // Collapse multiple spaces
-    .trim();
-}
-
-  interface HooktheorySection {
-    id: string; // Section UUID
-    source_track_id: string; // Source Track UUID
-    status?: string;
-    artist: string;
-    title: string;
-    section?: string;
-    "chord progression"?: string;
-    cp?: string | Record<string, any>; // Chord progression, can be string or object
-    key?: string;
-    scale?: string;
-    bpm?: number; // Should be number in DB
-    meter?: number;
-    beatUnit?: number;
-    danceability?: number;
-    energy?: number;
-    loudness?: number;
-    acousticness?: number;
-    instrumentalness?: number;
-    liveness?: number;
-    valence?: number;
-    "duration (ms)"?: number; // Section duration
-    genres?: string[]; // Assuming array
-    "time signature"?: string;
-    melody?: string  | Record<string, any>[];
-    youtube_id?: string;
-    "start timestamp (s)"?: number;
-    "end timestamp (s)"?: number;
-    cp_compare?: string;
-  }
-  
-  // Type definition for track data being processed internally
-  interface ProcessedTrackData {
-    anchor: boolean;
-    sections: HooktheorySection[];
-  }
   
   // --- API Route Handler ---
   export async function POST(req: Request) {

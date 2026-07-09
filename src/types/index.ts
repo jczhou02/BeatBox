@@ -47,9 +47,14 @@ export type Track = SpotifyTrack | UploadedTrack;
     key: string | null;
     tracks: Track[];
     mashupData: MashupData | null;
+    curateData: CurateData | null;
     createdAt: Date;
     updatedAt: Date;
     user_id: string; 
+  }
+
+  export interface CurateData {
+    
   }
   
 

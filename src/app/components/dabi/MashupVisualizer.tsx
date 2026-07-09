@@ -98,6 +98,7 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
   const [temperature, setTemperature] = useState(0.1); // Value from 0.0 to 1.0
   const [count, setCount] = useState(0); // numSuggestions
   const [isLoadingMashup, setIsLoadingMashup] = useState(false);
+  const [isCurating, setIsCurating] = useState(false);
   const [isPanningWheel, setIsPanningWheel] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [lastActiveParam, setLastActiveParam] = useState<'temperature' | 'count' | null>(null);
@@ -229,6 +230,12 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
         setDropdownOpen(false); 
     }
   };
+
+
+  const handleCurate = async () => {
+    console.log('building personally tailored set...');
+    setIsCurating(true);
+  }
 
   const getContainerGradient = (temp: number): string => {
     // Define start (cool) and end (warm) colors for the gradient
@@ -668,13 +675,18 @@ const MashupVisualizer: React.FC<MashupVisualizerProps> = ({ tracks, onUpdateTra
 
             {/* Lyrical Button (can be upgraded similarly later) */}
             <button 
-              className="w-full h-10 px-4 py-2 text-center text-white hover:bg-gray-700 transition-colors"
+              className="w-full h-10 px-4 py-2 text-center flex justify-center text-white hover:bg-gray-700 transition-colors"
               onClick={() => {
-                handleMashup("mashup-plus");
+                handleCurate();
               }}
             >
-               Lyrical
+               {isCurating ? (
+                    <FaSpinner className="animate-spin" />
+                  ) : (
+                    "Curate"
+                  )}
             </button>
+            
           </motion.div>
         )}
         </AnimatePresence>
