@@ -3,22 +3,24 @@
 import React, { useState, useEffect } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import Header from '@/components/layout/header';
+import SignInButton from '@/components/auth/signIn';
 
 export default function Home() {
   const { data: session, status } = useSession();
-  const [topTracks, setTopTracks] = useState([]);
-  const [topArtists, setTopArtists] = useState([]);
+  const [topTracks, setTopTracks] = useState<{ id: string; name: string; artists: { name: string }[] }[]>([]);
+  const [topArtists, setTopArtists] = useState<{ id: string; name: string }[]>([]);
 
   const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
   useEffect(() => {
     if (status === 'authenticated' && session?.accessToken) {
+      console.log('user_id: ', session?.user?.id);
       const now = Date.now();
 
       // Check localStorage for cached data and last fetch timestamp
-      const cachedTracks = JSON.parse(localStorage.getItem('topTracks'));
-      const cachedArtists = JSON.parse(localStorage.getItem('topArtists'));
-      const lastFetched = parseInt(localStorage.getItem('lastFetched'), 10);
+      const cachedTracks = localStorage.getItem('topTracks') ? JSON.parse(localStorage.getItem('topTracks') as string) : null;
+      const cachedArtists = localStorage.getItem('topArtists') ? JSON.parse(localStorage.getItem('topArtists') as string) : null;
+      const lastFetched = localStorage.getItem('lastFetched') ? parseInt(localStorage.getItem('lastFetched') as string, 10) : null;
 
       // If data is outdated (or missing), fetch fresh data
       if (!cachedTracks || !cachedArtists || !lastFetched || now - lastFetched > WEEK_IN_MS) {
@@ -32,6 +34,7 @@ export default function Home() {
         setTopArtists(cachedArtists);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, session]);
 
   const fetchTopTracks = async () => {
@@ -82,15 +85,14 @@ export default function Home() {
 
   if (status === 'unauthenticated') {
     return (
-      <div className="p-8 text-center">
-        <p>You need to sign in to access this page.</p>
-        <button
-          onClick={() => signIn('spotify')}
-          className="mt-4 bg-green-500 text-white px-4 py-2 rounded"
-        >
-          Sign in with Spotify
-        </button>
-      </div>
+      <div className="text-center p-8">
+          <h1 className="text-xl font-semibold mb-4">
+            You need to sign in to access your homepage.
+          </h1>
+          <div className="flex justify-center">
+            <SignInButton />
+          </div>
+        </div>
     );
   }
 

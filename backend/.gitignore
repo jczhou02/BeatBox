@@ -1,0 +1,21 @@
+# Python virtual environments
+venv/
+.env/
+*.env
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Test artifacts
+test/
+tests/
+*.pytest_cache/
+pytest.ini
+.coverage
+htmlcov/
+
+# MagicMock or mock data
+MagicMock/
+mock_*/

@@ -6,7 +6,9 @@ import {scope} from '@/app/utils/scope';
 
 const SignInButton: FC = () => {
   const handleSignIn = () => {
-    signIn('spotify',{},
+    const currentUrl = window.location.href;
+    localStorage.setItem('callbackUrl', currentUrl);
+    signIn('spotify',{ callbackUrl: currentUrl },
     {
       scope:scope,
       response_type: "code",
@@ -16,7 +18,7 @@ const SignInButton: FC = () => {
   return (
     <button
       onClick={handleSignIn}
-      className="flex items-center px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-opacity-75"
+      className="flex items-center px-3 py-1 bg-green-600 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-opacity-75"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

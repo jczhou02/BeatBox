@@ -1,12 +1,38 @@
-// beatbox/src/components/layout/Header.js
 'use client';
 
-import { useSession } from 'next-auth/react';
-import ToggleDarkMode from './darkmodetoggle';
-import { signOut } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
+import ToggleSound from './toggleSound';
 
 const Header = () => {
   const { data: session } = useSession();
+
+  const handleSignOut = async () => {
+    // 1. If a Spotify access token exists, revoke it on the server.
+    // if (session?.user?.accessToken) {
+    //   try {
+    //     await fetch('/api/spotify/revoke', {
+    //       method: 'POST',
+    //       headers: {
+    //         'Content-Type': 'application/json'
+    //       },
+    //       body: JSON.stringify({ token: session.user.accessToken })
+    //     });
+    //     console.log('Spotify token revoked.');
+    //   } catch (error) {
+    //     console.error('Error revoking Spotify token:', error);
+    //   }
+    // }
+
+    // 2. Clear any stored tokens (if you're storing them locally).
+    localStorage.removeItem('spotifyAccessToken');
+
+    // 3. (Optional) Disconnect the Spotify Web Playback SDK.
+    // If you keep a global reference to your Spotify player,
+    // call player.disconnect() here.
+
+    // 4. Finally, call next-auth's signOut.
+    signOut({ callbackUrl: '/' });
+  };
 
   return (
     <div className="border-b-4 border-black flex justify-between items-center px-4">
@@ -16,9 +42,12 @@ const Header = () => {
           : 'Welcome to BeatBox! Please sign into your Spotify account and prepare for battle 🎵'}
       </div>
       <div className="ml-auto flex items-center space-x-4">
-        <ToggleDarkMode />
+        <ToggleSound />
         {session && (
-          <button onClick={() => signOut({ callbackUrl: '/' })} className="bg-red-500 text-white px-3 py-1 rounded">
+          <button
+            onClick={handleSignOut}
+            className="bg-red-500 text-white px-3 py-1 rounded"
+          >
             Sign out
           </button>
         )}

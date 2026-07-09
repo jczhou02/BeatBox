@@ -1,9 +1,9 @@
 import { configureStore } from "@reduxjs/toolkit";
-import darkmodeSlice from "../slice/darkModeSlice";
+import soundSlice from "../slice/soundSlice";
 
 const store = configureStore({
   reducer: {
-    darkmode: darkmodeSlice,
+    sound: soundSlice,
   },
 });
 
